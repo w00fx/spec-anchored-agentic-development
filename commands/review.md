@@ -3,7 +3,7 @@ description: Run the independent reviewer on a diff, branch, PR, or path (report
 argument-hint: [diff | branch | PR | path]
 ---
 
-Dispatch the `reviewer` agent via the Task tool, in isolated context, on the
+Dispatch the `reviewer` agent via the Agent tool, in isolated context, on the
 target in the argument — the working-tree diff by default, or a branch, PR
 number, or path if given. Do NOT review it yourself in this session: the
 independence of a fresh context that did not write the work is the point.

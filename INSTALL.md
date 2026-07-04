@@ -30,6 +30,7 @@ cp <path-to-bundle>/spec-templates/capability-spec.md specs/_template/
 | `.claude/skills/implement-feature/references/log-template.md` | Log schema for the skill's runs (read when opening the run log) |
 | `.claude/skills/implement-backlog/SKILL.md` | AUTONOMOUS workflow (named-blocker aborts; runs under headless `/goal`) |
 | `.claude/skills/implement-backlog/references/log-template.md` | Log schema for autonomous runs (read when opening the run log) |
+| `.claude/skills/implement-backlog/references/pr-template.md` | PR description template for autonomous runs (the Approved-plan section is the plan's public home) |
 | `.claude/agents/reviewer.md` | Reviewer sub-agent — router + single-lens mode |
 | `.claude/skills/plan-review/SKILL.md` | Plan-gate criteria (incl. capability-vs-entity test for new folders) |
 | `.claude/skills/general-code-review/SKILL.md` | Generic criteria — correctness, simplicity, tests, types, structure |

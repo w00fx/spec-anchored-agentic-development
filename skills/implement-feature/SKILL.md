@@ -296,7 +296,7 @@ exists to catch issues early, not to replace CI.
 
 ## Phase 5: Code Review
 
-Use the Task tool to dispatch the `reviewer` agent in isolated context
+Use the Agent tool to dispatch the `reviewer` agent in isolated context
 (it did not write this code — that independence is the point).
 
 **Default — one reviewer, all applicable lenses:**
@@ -471,7 +471,7 @@ cross-cutting invariants worth restating:
   `/goal` (`claude -p`) no one answers, so the gates are silently
   overrun — headless autonomy belongs to `implement-backlog`, never
   here.
-- **Dispatch the reviewer via the Task tool, in isolated context** — a
+- **Dispatch the reviewer via the Agent tool, in isolated context** — a
   reviewer that didn't write the code is the entire point of Phase 5.
 - **Stop after 3 attempts at the same failure** and present the
   situation: repeated blind retries burn budget and usually mean the

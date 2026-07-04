@@ -656,7 +656,7 @@ Seven-phase flow, with a human confirmation gate after Phase 1, 1.5, and 2:
 - **Phase 2: Plan** — ULTRATHINK in plan mode (read-only). Lists files it will edit (committed scope), and separates load-bearing decisions (which determine whether the approach works or which architecture is committed — pinned now) from deferred details (reversible, left to implementation).
 - **Phase 3: Implement** — executes the plan. Runs lint + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
 - **Phase 4: Test** — full local suite. Doesn't proceed until green.
-- **Phase 5: Code Review** — dispatches the `reviewer` agent (the router, see below) via the Task tool in isolated context; it routes to the applicable review-criteria skills. Sequential with Phase 4 — any fix forces a return to Phase 4.
+- **Phase 5: Code Review** — dispatches the `reviewer` agent (the router, see below) via the Agent tool (renamed from Task; the alias still works) in isolated context; it routes to the applicable review-criteria skills. Sequential with Phase 4 — any fix forces a return to Phase 4.
 - **Phase 6: Close the loop** — appends to lessons, possible spec update (with the `requires_human_approval` flag), AGENTS.md/CLAUDE.md proposal (propose-only, doesn't edit directly), backlog status.
 - **Phase 7: Present Results** — structured report with QA results, loop closure, commits, human approval flag.
 

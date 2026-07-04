@@ -174,7 +174,7 @@ explicitly. The plan also goes into the PR description (Phase 7).
 
 In `implement-feature` a human reviews the plan before code is written.
 Here there's no human — so a fresh subagent is the gate. Before proceeding
-to Phase 3, dispatch a plan-review subagent via the Task tool, in isolated
+to Phase 3, dispatch a plan-review subagent via the Agent tool, in isolated
 context (it must NOT be the context that wrote the plan — a fresh context
 doesn't share the author's blind spots):
 
@@ -320,7 +320,7 @@ Do NOT proceed to Phase 5 until tests are green.
 
 ## Phase 5: Code Review
 
-Use the Task tool to dispatch the `reviewer` agent in isolated context
+Use the Agent tool to dispatch the `reviewer` agent in isolated context
 (it did not write this code).
 
 **Default — one reviewer, all applicable lenses:**
@@ -391,38 +391,14 @@ Only proceed once tests are green AND review is clean.
 ## Phase 7: Open PR and monitor until landed
 
 Opening the PR is NOT the finish line. Done = the change merged clean, or
-you're blocked on something only a human can resolve. Open the PR with this
-description structure:
-
-```markdown
-## [Issue title / reference]
-
-Closes #[issue number]
-
-### Scope
-[What was done, mapped to the issue]
-
-### Files changed
-[List with brief description of each]
-
-### QA Results
-- Tests: ✅ [N passed, 0 failed]
-- Code Review: ✅ [summary]
-
-### Loop closure
-- Lessons added: [yes/no, with summary]
-- Spec correction proposed: [no / summary]
-- CLAUDE.md changes proposed: [yes/no, with summary]
-
-### Human approval required
-[yes/no — reason]
-
-### Commits
-[List]
-
-### Log
-.claude/logs/implement-backlog-{timestamp}.md
-```
+you're blocked on something only a human can resolve. Open the PR
+following the description template in `references/pr-template.md`: read
+it when you open the PR and mirror its sections. Two of them are
+load-bearing beyond the human review — the **Approved plan** section is
+the plan's public home (Phase 2 records the plan in the log *and*
+here; `/explain` and any future reviewer without this conversation
+pull intent from it), and **Spec correction proposed** pairs with the
+`requires_human_approval` flag.
 
 If `requires_human_approval = true`, apply a label like
 `human-approval-required` on the PR (or the repo convention).
@@ -496,7 +472,7 @@ the cross-cutting invariants worth restating:
 - **The plan-review gate always runs before code**, in a fresh
   context. It replaces the human gate of `implement-feature`; skipping
   it means no gate at all.
-- **Dispatch the reviewer via the Task tool, in isolated context** — a
+- **Dispatch the reviewer via the Agent tool, in isolated context** — a
   reviewer that didn't write the work is the point, for the plan and
   for the code.
 - **Never edit the spec or CLAUDE.md in this skill** — propose in the
