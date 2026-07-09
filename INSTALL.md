@@ -5,19 +5,31 @@ This bundle turns a coding agent into the system described in `GUIDELINE.md`
 implementation skills, a reviewer agent with criteria lenses, and the native
 `/goal` loop.
 
-Copy the `.claude/` folder into your repository root and the root-level
-documents wherever your team keeps them. Read `GUIDELINE.md` first;
-`AUTONOMY-PLAYBOOK.md` when you start widening autonomy.
+The bundle folders live at this repository's top level (`skills/`,
+`commands/`, `agents/`, `rules/`, `hooks/`, `routines/`). Install them
+under `.claude/` in your repository (project-level) or under `~/.claude/`
+(user-level), and the spec template under `specs/_template/`:
+
+```bash
+# from your repository root
+mkdir -p .claude specs/_template
+cp -R <path-to-bundle>/{skills,commands,agents,rules,hooks,routines} .claude/
+cp <path-to-bundle>/spec-templates/capability-spec.md specs/_template/
+```
+
+The root-level documents go wherever your team keeps docs. Read
+`GUIDELINE.md` first; `AUTONOMY-PLAYBOOK.md` when you start widening
+autonomy.
 
 ## Where each file goes
 
-| File | What it is |
+| Installed path | What it is |
 |---|---|
 | `GUIDELINE.md` | The system — read this first |
 | `AUTONOMY-PLAYBOOK.md` | Milestones 1-4, Tier 1/2 metrics, per-class auto-merge |
 | `sources-and-learnings.md` | Source catalog + decision record |
 | `CLAUDE-codebase-exploration-block.md` | Paste into your root CLAUDE.md (example tool stack — swap in yours) |
-| `spec-templates/capability-spec.md` | The permanent capability-spec template (EARS + GWT + reference values) |
+| `specs/_template/capability-spec.md` | The permanent capability-spec template (EARS + GWT + reference values) |
 | `.claude/skills/implement-feature/SKILL.md` | LOCAL workflow (7 phases, human gates; interactive only — plain or supervised `/goal`, never headless) |
 | `.claude/skills/implement-feature/references/log-template.md` | Log schema for the skill's runs (read when opening the run log) |
 | `.claude/skills/implement-backlog/SKILL.md` | AUTONOMOUS workflow (named-blocker aborts; runs under headless `/goal`) |

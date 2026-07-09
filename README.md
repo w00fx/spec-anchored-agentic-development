@@ -58,27 +58,27 @@ The narrow start needs no formal eval suite: issues → hard-coded allowlist of 
 | [`sources-and-learnings.md`](sources-and-learnings.md) | Every external source mined while designing the methodology, what each contributed, what was rejected and why — the audit trail of *why the system is the way it is*. |
 | [`CLAUDE-codebase-exploration-block.md`](CLAUDE-codebase-exploration-block.md) | A codebase-exploration block to paste into your root context file (example tool stack — swap in yours). |
 
-### The bundle (the `.claude/` folder, plus the spec template)
+### The bundle (drop into `.claude/` and `specs/`)
 
 | Path | What it is |
 |------|------------|
-| `.claude/skills/implement-feature/` | **Local** 7-phase workflow with human confirmation gates (interactive; plain or supervised `/goal`, never headless). |
-| `.claude/skills/implement-backlog/` | **Autonomous** workflow with named-blocker aborts; runs under headless `/goal`. Its `references/` carry the shared PR playbook and the rationalizations table. |
-| `.claude/skills/plan-review/` | Reviewer criteria: plan approach soundness (incl. the capability-vs-entity test for new folders). |
-| `.claude/skills/general-code-review/` | Reviewer criteria: correctness, simplicity/reuse, test quality, type design — the default lens. Its `references/` carry the shared test bar and the twelve-smell baseline. |
-| `.claude/skills/constitution-compliance-review/` | Contextual reviewer criteria: the project constitution (numeric types, audit trail, source citation, stage boundaries, past-period rules). |
-| `.claude/skills/conformance-review/` | Contextual reviewer criteria: diff vs capability spec, and diff vs approved plan. |
-| `.claude/agents/reviewer.md` | The independent reviewer agent — a **router** that loads the criteria skills that fit what it's handed and reports findings; it never edits. |
-| `.claude/commands/implement.md` | Local entry point → `implement-feature`. |
-| `.claude/commands/review.md` | On-demand reviewer, report-only. |
-| `.claude/commands/explain.md` | Post-implementation walkthrough → `docs/walkthroughs/`. |
-| `.claude/commands/shape.md` | Work-shaping interview: a spec from an idea, transcript, or existing code; grill-back refinement of an existing spec; task sharpening. One question at a time, always with a recommended answer. |
-| `.claude/commands/spec-to-tickets.md` | Breaks a committed spec into tracer-bullet tickets with blocking edges; quizzes the human before publishing to `tickets.md` or GitHub Issues. |
-| `.claude/commands/plan-from-issue.md` | Phased implementation plan from a GitHub issue (Plan Mode; no implementation). |
-| `.claude/commands/review-spec-drift.md` | Periodic whole-capability spec ↔ code drift audit. |
-| `.claude/rules/package-by-feature.md` | Always-loaded rule: the capability-vs-entity tests applied at file-creation time. |
-| `.claude/hooks/require-spec-for-new-capability.sh` | Opt-in poka-yoke hook: blocks a new `src/<x>/` without a matching `specs/<x>/`. |
-| `.claude/routines/frontier-worker.md` | Canonical scheduled-Routine prompt: scan the frontier, claim one issue, run the headless `/goal`. |
+| `skills/implement-feature/` | **Local** 7-phase workflow with human confirmation gates (interactive; plain or supervised `/goal`, never headless). |
+| `skills/implement-backlog/` | **Autonomous** workflow with named-blocker aborts; runs under headless `/goal`. Its `references/` carry the shared PR playbook and the rationalizations table. |
+| `skills/plan-review/` | Reviewer criteria: plan approach soundness (incl. the capability-vs-entity test for new folders). |
+| `skills/general-code-review/` | Reviewer criteria: correctness, simplicity/reuse, test quality, type design — the default lens. Its `references/` carry the shared test bar and the twelve-smell baseline. |
+| `skills/constitution-compliance-review/` | Contextual reviewer criteria: the project constitution (numeric types, audit trail, source citation, stage boundaries, past-period rules). |
+| `skills/conformance-review/` | Contextual reviewer criteria: diff vs capability spec, and diff vs approved plan. |
+| `agents/reviewer.md` | The independent reviewer agent — a **router** that loads the criteria skills that fit what it's handed and reports findings; it never edits. |
+| `commands/implement.md` | Local entry point → `implement-feature`. |
+| `commands/review.md` | On-demand reviewer, report-only. |
+| `commands/explain.md` | Post-implementation walkthrough → `docs/walkthroughs/`. |
+| `commands/shape.md` | Work-shaping interview: a spec from an idea, transcript, or existing code; grill-back refinement of an existing spec; task sharpening. One question at a time, always with a recommended answer. |
+| `commands/spec-to-tickets.md` | Breaks a committed spec into tracer-bullet tickets with blocking edges; quizzes the human before publishing to `tickets.md` or GitHub Issues. |
+| `commands/plan-from-issue.md` | Phased implementation plan from a GitHub issue (Plan Mode; no implementation). |
+| `commands/review-spec-drift.md` | Periodic whole-capability spec ↔ code drift audit. |
+| `rules/package-by-feature.md` | Always-loaded rule: the capability-vs-entity tests applied at file-creation time. |
+| `hooks/require-spec-for-new-capability.sh` | Opt-in poka-yoke hook: blocks a new `src/<x>/` without a matching `specs/<x>/`. |
+| `routines/frontier-worker.md` | Canonical scheduled-Routine prompt: scan the frontier, claim one issue, run the headless `/goal`. |
 | `spec-templates/capability-spec.md` | **The** spec template — one type, permanent (EARS rules + Given/When/Then criteria + reference values). |
 
 ## The two workflows
@@ -87,13 +87,13 @@ Both run the same **Plan → Implement → QA → Close the loop** cycle; they d
 
 - **`implement-feature`** (local, human-driven) — seven phases with human confirmation gates after Understand, Resolve-ambiguities, and Plan. A question at a gate pauses the turn. Recommended invocation for anything with acceptance criteria: a **supervised `/goal`** that keeps the human gates *and* stops the worker from declaring itself done — a fresh evaluator re-checks the completion condition against the transcript each turn, demanding evidence rather than claims.
 
-- **`implement-backlog`** (autonomous, agent-driven) — the persistence engine is Claude Code's native `/goal`; a thin GitHub Action runs it headless on an `auto-implement` label, or a scheduled Routine works the frontier (`.claude/routines/frontier-worker.md`). There is no one to answer a gate, so every would-be question becomes a **named-blocker abort** (needs-refinement, scope-expansion-needed, qa-blocked, review-blocked, plus the scope-routing pair wrong-skill / needs-human-implementation) and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after. Scope is restricted to increments; new capabilities and large features route back to `implement-feature`.
+- **`implement-backlog`** (autonomous, agent-driven) — the persistence engine is Claude Code's native `/goal`; a thin GitHub Action runs it headless on an `auto-implement` label, or a scheduled Routine works the frontier (`routines/frontier-worker.md`). There is no one to answer a gate, so every would-be question becomes a **named-blocker abort** (needs-refinement, scope-expansion-needed, qa-blocked, review-blocked, plus the scope-routing pair wrong-skill / needs-human-implementation) and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after. Scope is restricted to increments; new capabilities and large features route back to `implement-feature`.
 
 Review (Phase 5, and the autonomous plan gate) is never inlined — it dispatches the independent `reviewer` agent in isolated context that did **not** write the work under review, because a fresh context doesn't share the author's blind spots.
 
 ## Installation
 
-See [`INSTALL.md`](INSTALL.md). In short: copy the `.claude/` folder into your repository root (or merge it into `~/.claude/`), keep `specs/` and `docs/` centralized, and put a `CLAUDE.md`/`AGENTS.md` next to each capability's code pointing at its spec. Then:
+See [`INSTALL.md`](INSTALL.md). In short: copy the bundle folders into your repository's `.claude/` (or `~/.claude/`), the spec template into `specs/_template/`, keep `specs/` and `docs/` centralized, and put a `CLAUDE.md`/`AGENTS.md` next to each capability's code pointing at its spec. Then:
 
 1. Read [`GUIDELINE.md`](GUIDELINE.md). The floor is **one spec file** — start there.
 2. Shape the first capability spec with `/shape` (it writes from the template); add the constitution when invariant rules demand it. When the spec is ready, `/spec-to-tickets` breaks it into tracer-bullet issues.
