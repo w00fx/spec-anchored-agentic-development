@@ -33,6 +33,7 @@ reconstructed at the end.
 - Iterations: [N]
 
 ## Phase 5: Review
+- PR: [link]
 - Report summary: [...]
 - Disputed findings: [none / finding → arbitration outcome]
 - Iterations: [N]

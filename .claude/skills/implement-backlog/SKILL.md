@@ -15,7 +15,9 @@ description: >
   Every run produces a structured log.
 
   Trigger: a thin GitHub Action runs `claude -p "/goal ..."` in headless
-  mode when an issue gets the `auto-implement` label. Claude Code's native
+  mode when an issue gets the `auto-implement` label — or a scheduled
+  Routine works the frontier (canonical prompt:
+  `.claude/routines/frontier-worker.md`). Claude Code's native
   /goal command is the persistence engine; this skill is the workflow it
   drives. There is no custom orchestrator service.
 ---
@@ -48,7 +50,10 @@ the abort cases below — including a "done with a named blocker" clause, so
 a legitimate abort ends the goal instead of looping forever. The Action is
 the trigger, the native `/goal` is the engine, this skill is the workflow,
 and the `reviewer` agent carries the criteria — there is no custom
-orchestrator service.
+orchestrator service. A scheduled Claude Code **Routine** is the sibling
+wiring — same engine, same condition shape; it scans the frontier,
+claims one issue, and issues the `/goal` (canonical prompt:
+`.claude/routines/frontier-worker.md`).
 
 **Target model:** this skill is tuned for Claude Opus 4.8 running in
 Claude Code headless mode (`claude -p`). The thinking-depth lever here
@@ -112,6 +117,11 @@ Check explicitly for:
 - Acceptance criteria not specific enough to verify ("should work", "must
   be correct" are not criteria).
 - Source attribution: required normative source not provided.
+- **New-rule check:** the issue's expected behavior encodes a business
+  rule the capability spec does not cover — that is a spec change, not
+  an increment. Rule merges are human-gated (this skill never edits
+  the spec): abort, and the comment names the rule and routes the work
+  to the human-led path.
 
 As you scan, label every point where you would otherwise fill an
 unspecified behavior with a plausible default: write it as `ASSUMPTION:
@@ -152,7 +162,11 @@ file.
    - What could break, especially cross-capability concerns.
    - What edge cases the issue makes explicit.
 3. Break the work into small, sequential changes.
-4. Identify which tests need to be written or updated.
+4. Identify which tests need to be written or updated — and the
+   **seam** they attach to: prefer an existing seam over a new one, the
+   highest seam that still isolates the behavior, ideally one for the
+   whole change. A good seam gives tests something durable to target,
+   so the code underneath can change without the tests moving.
 5. Map dependencies between steps.
 6. Explicitly list the files you expect to edit. This is your committed
    scope for Phase 3.
@@ -227,13 +241,25 @@ reviewer agent, multiple criteria skills; here it loads plan-review.
    anchor on the behavior described in the spec's acceptance criteria
    (or the issue's) — NOT on what the code happens to
    do. A test derived from the implementation confirms the implementation;
-   it doesn't prove the behavior is correct.
+   it doesn't prove the behavior is correct. Write to the shared
+   standard the reviewer will hold this work to:
+   `.claude/skills/general-code-review/references/test-standards.md`
+   (worked GOOD/BAD examples + the mocking boundary rule).
 3. Follow all rules in `.claude/rules/`.
-4. After each logical chunk — before writing the next one — run lint AND
+4. After each logical chunk — before writing the next one — run lint, typecheck, AND
    the tests covering the code you just touched. Do not write the next
-   chunk until both are green. Checks every chunk (not batched at the end)
+   chunk until all three are green. Checks every chunk (not batched at the end)
    catch a break while it's cheap to locate. Run the full suite in Phase 4
    regardless.
+
+**Work branch — before the first edit or commit:**
+
+If the harness already put the session on a dedicated work branch
+(Routines does: `claude/`-prefixed — stay on it; the platform only
+allows pushes there), use it. Otherwise create one named by type,
+with the issue number: `fix/142-<slug>`, `feature/<slug>`,
+`refactor/<slug>`, `chore/<slug>`. Never commit to the default
+branch.
 
 **Commits during implementation:**
 
@@ -274,6 +300,30 @@ committed scope from Phase 2:
 Unlike `implement-feature` (which can ask a human to approve expansion
 in-flight), this skill aborts. A clean abort with explanation is cheaper
 than a PR that grew unrecognizably during implementation.
+
+**Plan invalidation — when the approach itself fails:**
+
+Scope discipline covers "I need one more file." This covers the bigger
+break: implementation reveals that a load-bearing decision from the
+approved plan is wrong, or the approach doesn't work. Do not improvise
+a new approach inside the old plan — an approved plan the code no
+longer follows is fiction, and conformance review will flag the
+divergence anyway. Instead:
+
+1. STOP editing.
+2. Produce a revised plan as a **delta** over the approved one: what
+   changes, why, and what the implementation revealed that planning
+   didn't foresee.
+3. Re-dispatch the plan-review gate — Phase 2's prompt, plus the prior
+   findings section AND the delta's rationale. The gate that approved
+   the original plan is the gate for its revision; no human is needed,
+   because the plan gate here was never a human.
+4. The revision counts against the **same 3-iteration plan-review
+   cap** as Phase 2. Cap exhausted → the existing abort: comment with
+   what failed, label `needs-refinement`, log, STOP.
+5. On approval: record the replan in the log (`Replans`), revert the
+   work the new plan invalidates (never leave it half-aligned), and
+   continue under the revised plan.
 
 **Minimal solution — the Opus guard:**
 
@@ -323,6 +373,9 @@ Do NOT proceed to Phase 5 until tests are green.
 Use the Agent tool to dispatch the `reviewer` agent in isolated context
 (it did not write this code).
 
+Before any dispatch, confirm the diff is non-empty — an empty diff
+should fail here, not inside the reviewer.
+
 **Default — one reviewer, all applicable lenses:**
 
 - task: Run reviewer
@@ -351,7 +404,14 @@ parallelized.
 Wait for the review report(s).
 
 **If issues found:**
-1. Fix the issues.
+1. Fix the issues — and each fix ships with a **regression test that
+   failed before the fix and passes after it**, when the finding is
+   test-shaped. A finding fixed without red-then-green is fixed by
+   claim, not by proof — and the class of bug the reviewer caught once
+   should be caught by the machine forever after. When a finding isn't
+   test-shaped (naming, structure, a comment), say so and note how it
+   was verified instead. Never invent a hollow test just to satisfy
+   this step.
 2. Go back to Phase 4 (tests) → Phase 5 (Code Review).
 3. Repeat until the review passes — but apply the same 3-iteration
    cap. If the review keeps surfacing the same kind of issue 3+ times,
@@ -405,32 +465,9 @@ If `requires_human_approval = true`, apply a label like
 
 Post a comment on the originating issue with the PR link.
 
-**Monitor until landed.** After opening, watch the PR until it merges
-clean — do not abandon it at open:
-
-- **CI to completion**, not just to the first green. A check can go green
-  then flip red as the full pipeline runs (the green-minute rule) — wait
-  for the pipeline to settle.
-- **Late comments.** From an *external review tool*: advisory. They inform
-  the human who approves the merge; the loop does not wait on them or abort
-  on them, and they are NOT part of the completion condition (what gates is
-  Phase 5 + CI — deterministic checks and the contextual reviewer, reliable
-  enough to block; an external reviewer's precision is not). From a *human*:
-  address them if in scope, or if they need a decision only a human can
-  make, leave the PR for human resolution and stop.
-- **Merge conflicts** — if the base branch moved, rebase/resolve and
-  re-run the QA gates (Phase 4 → Phase 5) on the result, since resolving a
-  conflict is a code change.
-
-If monitoring surfaces an issue the skill can fix within scope, fix it and
-re-run the affected gates. If it surfaces something out of scope or needing
-human judgment, comment on the PR/issue naming exactly what's blocking and
-stop — don't mark done around an unresolved check.
-
-(Operational note: monitoring runs against the GitHub API. The watch window
-and whether merge is automatic or human-gated follow repo policy — until
-auto-merge by class exists (`AUTONOMY-PLAYBOOK.md`, Milestone 4), a human merges, and
-the skill's job ends at "PR green, reviewed, and nothing outstanding.")
+**Monitor until landed** — the full protocol (CI to completion, the
+late-comments policy, merge conflicts re-running the gates) lives in
+`references/pr-template.md`: read it when the PR opens.
 
 ## Structured logging
 
@@ -445,19 +482,11 @@ during the run, the log is the only record of the decisions taken.
 
 ## Common rationalizations
 
-The shortcuts that turn an autonomous run into a discarded PR or a human's
-cleanup. In autonomous mode there's no human to catch these mid-run — the
-machine has to.
-
-| Rationalization | Reality |
-|-----------------|---------|
-| "The tests pass, so it's done" | Tests written alongside the code confirm the implementation, not the spec. Green proves "works as I tested," not "works as specified." |
-| "The approach is obvious, skip the plan review" | The plan-review subagent is the only gate before code in autonomous mode. Obvious-and-unreviewed is exactly how the wrong approach ships a PR that gets discarded. |
-| "I'll run the full checks at the end" | Run lint + touched tests every chunk. End-only batching turns one red bar into a bisecting session with no human watching. |
-| "This file is just outside scope, I'll edit it anyway" | Silent scope growth has no human to catch it here. Abort with a comment — that's the rule, not a suggestion. |
-| "The PR is open, the run is done" | Open ≠ landed. Monitor CI to completion, late comments, and conflicts until it merges clean or you name a blocker. |
-| "CI will catch it" | CI catching it means a red PR waiting on a human. Catch it locally first, in Phase 4. |
-| "The flaky check isn't really my problem" | A red check is unresolved work. Fix it, or stop and name the blocker — never retry-until-green or mark done around it. |
+The shortcuts that turn an autonomous run into a discarded PR or a
+human's cleanup — and in autonomous mode there's no human to catch
+them mid-run, so the machine has to. The full table lives in
+`references/rationalizations.md`: read it alongside the log template
+when the run starts.
 
 ## Critical rules
 
@@ -465,10 +494,12 @@ The phases above carry their own protocols and reasons; these five are
 the cross-cutting invariants worth restating:
 
 - **No human mid-run — abort instead.** Every would-be question is an
-  abort with issue comment + label + log entry. The four labels are
-  the vocabulary: `needs-refinement`, `scope-expansion-needed`,
-  `qa-blocked`, `review-blocked` (each phase defines its trigger — the
-  labels are stable; the conditions live where they're enforced).
+  abort with issue comment + label + log entry. The labels are the
+  vocabulary: `needs-refinement`, `scope-expansion-needed`,
+  `qa-blocked`, `review-blocked`, plus Phase 1's scope-routing pair
+  (`wrong-skill` / `needs-human-implementation`). Each phase defines
+  its trigger — the labels are stable; the conditions live where
+  they're enforced.
 - **The plan-review gate always runs before code**, in a fresh
   context. It replaces the human gate of `implement-feature`; skipping
   it means no gate at all.

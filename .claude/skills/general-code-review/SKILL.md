@@ -50,6 +50,8 @@ Could this be smaller, clearer, or stop repeating itself?
 - **Altitude:** a function doing too many things; deeply nested conditionals that flatten with early returns; a long parameter list that wants an object.
 - **Naming & clarity:** names that mislead or under-describe; a comment that exists only because the code is unclear (fix the code). Comments explain *why*, not *what*.
 
+The named vocabulary for structural findings — twelve Fowler smells with fixes, under the binding rules (the repo's documented standard overrides; always a judgement call, capped at [SHOULD]; skip what tooling enforces) — lives in `references/smell-baseline.md`; read it when structural quality is in question.
+
 ## Dimension 3 — Test quality
 
 Tests are the machine that says "no" on the next change — judge whether they actually will.
@@ -60,6 +62,8 @@ Tests are the machine that says "no" on the next change — judge whether they a
 - **Over-mocking:** mocking the thing under test, or so much that the test only proves the mocks were called. Prefer real collaborators; mock only at genuine boundaries (network, clock, fs).
 - **Edge & negative cases:** error inputs, empty inputs, the boundary values from Dimension 1.
 - **Determinism:** no reliance on real time, random, network, or ordering; no leaked state between tests.
+
+Worked GOOD/BAD examples and the mocking boundary rule live in `references/test-standards.md` — read it whenever the diff touches tests.
 
 ## Dimension 4 — Type design
 

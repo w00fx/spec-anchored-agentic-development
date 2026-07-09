@@ -196,7 +196,8 @@ project/
 │   │   ├── review.md                  ← on-demand reviewer entry point (report-only)
 │   │   ├── explain.md                 ← post-implementation walkthrough of the changes (reference + audit)
 │   │   ├── plan-from-issue.md
-│   │   ├── interview-spec.md
+│   │   ├── shape.md
+│   │   ├── spec-to-tickets.md
 │   │   └── review-spec-drift.md
 │   ├── agents/
 │   │   └── reviewer.md                ← independent router (doesn't write; routes; reports)
@@ -353,16 +354,6 @@ Read `@architecture/constitution.md` before architectural decisions.
 - `@architecture/pipeline.md` — Read when: modifying contracts between capabilities
 - `@docs/<domain-glossary>.md` — Read when: encountering an unfamiliar domain term
 - `@architecture/decisions/` — Read when: making a new architectural decision
-
-## Codebase exploration
-
-- Outline before content: structural queries (search, symbols, file outline)
-  before whole-file reads; open a full file only when you need literal
-  content — usually because you're about to edit it
-- Native Read of a file before editing it
-- Optional: dedicated structural-query tools (e.g. grepika, tilth,
-  cachebro) cut context consumption further — swap in your stack's
-  equivalents; the discipline matters, not the specific tools
 
 ## Plan Mode
 
@@ -550,7 +541,7 @@ How:
 
 1. Create the empty file at the correct path.
 2. Start a Claude Code session in Plan Mode.
-3. Use the `/interview-spec` slash command or a direct prompt:
+3. Use the `/shape` slash command or a direct prompt:
 
 ```
 I'm going to create a spec for [capability]. Use the template in
@@ -588,7 +579,9 @@ Saved in `.claude/commands/`. Versioned in the repo.
 
 **`/plan-from-issue.md`** — generates a phased implementation plan from a GitHub issue (reads the issue, the capability's context file and spec, enters Plan Mode; no implementation). Ships in the bundle.
 
-**`/interview-spec.md`** — the spec-creation interview: walks the capability-spec template section by section (business rules in EARS with sources, Given/When/Then criteria with reference values, non-goals, contracts) and writes the spec. Ships in the bundle.
+**`/shape.md`** — the work-shaping interview, one question at a time with a recommended answer every time, the codebase consulted before the human. Creates a capability spec from an idea, a transcript, or existing code; refines an existing spec (grill-back: divergence probe, boundary probe, oracle coverage); or sharpens a task until an agent could implement it without guessing. Ships in the bundle.
+
+**`/spec-to-tickets.md`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's numbered criteria, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
 
 **`/review-spec-drift.md`** — the periodic whole-capability audit: spec ↔ code ↔ contracts divergence, reported as critical / relevant / cosmetic drift. Complements `conformance-review`, which is diff-scoped. Ships in the bundle.
 
@@ -611,6 +604,8 @@ Done when ALL of the following hold:
 - any criterion no executable test can verify is explicitly listed
   as NOT MACHINE-VERIFIED in the final summary;
 - the full suite is green; the reviewer reports zero [BLOCKER];
+- the work branch is pushed and a PR is open, its description on the
+  shared template (Approved plan included);
 - hard cap: 30 turns.
 ```
 
@@ -632,6 +627,8 @@ Done when ALL of the following hold:
 - nothing outside the spec's Non-goals was implemented;
 - full suite green; reviewer reports zero [BLOCKER], with
   conformance-review applied (diff vs spec);
+- the work branch is pushed and a PR is open, its description on the
+  shared template (Approved plan included);
 - hard cap: 40 turns.
 ```
 
@@ -654,17 +651,17 @@ Seven-phase flow, with a human confirmation gate after Phase 1, 1.5, and 2:
 - **Phase 1: Understand** — reads the instruction, input (spec/issue), root AGENTS.md/CLAUDE.md → capability AGENTS.md/CLAUDE.md → pointed spec, `.claude/rules/`, `lessons.md`. Maps affected code.
 - **Phase 1.5: Resolve ambiguities** — surfaces ambiguities via AskUserQuestion. Does not proceed with unresolved ambiguity.
 - **Phase 2: Plan** — ULTRATHINK in plan mode (read-only). Lists files it will edit (committed scope), and separates load-bearing decisions (which determine whether the approach works or which architecture is committed — pinned now) from deferred details (reversible, left to implementation).
-- **Phase 3: Implement** — executes the plan. Runs lint + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
+- **Phase 3: Implement** — executes the plan on a typed work branch (`feature/`, `fix/`, `refactor/`, `chore/`). Runs lint + typecheck + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
 - **Phase 4: Test** — full local suite. Doesn't proceed until green.
 - **Phase 5: Code Review** — dispatches the `reviewer` agent (the router, see below) via the Agent tool (renamed from Task; the alias still works) in isolated context; it routes to the applicable review-criteria skills. Sequential with Phase 4 — any fix forces a return to Phase 4.
 - **Phase 6: Close the loop** — appends to lessons, possible spec update (with the `requires_human_approval` flag), AGENTS.md/CLAUDE.md proposal (propose-only, doesn't edit directly), backlog status.
-- **Phase 7: Present Results** — structured report with QA results, loop closure, commits, human approval flag.
+- **Phase 7: Open PR & Present Results** — pushes the typed work branch, opens a PR (description on the shared template, Approved plan included), and reports in chat: link, scope, decisions needing attention, human-approval flag.
 
 Structured logging in `.claude/logs/implement-{timestamp}.md` for auditability.
 
 **`implement-backlog`** — autonomous skill, agent-driven.
 
-For end-to-end execution **with no human in the loop**. The persistence engine is Claude Code's native `/goal` command (a session-scoped Stop hook: after each turn a fresh model re-checks a completion condition and forces another turn until it holds). A thin GitHub Action runs `claude -p "/goal <condition>"` in headless mode when an issue gets an `auto-implement` label; the condition names this skill as the workflow and mirrors its completion criteria and aborts. There is no custom orchestrator service — the Action is the trigger, the native `/goal` is the engine, the skill is the workflow, and the `reviewer` carries the criteria.
+For end-to-end execution **with no human in the loop**. The persistence engine is Claude Code's native `/goal` command (a session-scoped Stop hook: after each turn a fresh model re-checks a completion condition and forces another turn until it holds). A thin GitHub Action runs `claude -p "/goal <condition>"` in headless mode when an issue gets an `auto-implement` label; the condition names this skill as the workflow and mirrors its completion criteria and aborts. There is no custom orchestrator service — the Action is the trigger, the native `/goal` is the engine, the skill is the workflow, and the `reviewer` carries the criteria. A scheduled Claude Code Routine is the sibling wiring — same engine, same condition shape; its canonical prompt ships in the bundle (`.claude/routines/frontier-worker.md`): scan the frontier, claim one issue, issue the `/goal`.
 
 One property of headless runs governs the whole design: **a question to the user never gates a headless `/goal` run** — there is no one to answer, and the evaluator reads only the transcript, so an interactive gate would be silently overrun rather than block. That is why this skill never asks: every would-be question is a **named-blocker abort** (the only human stop the evaluator can read), and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after it.
 
@@ -804,7 +801,7 @@ Starting a feature:
 4. Decide: simple change, large feature, or new capability?
    - **Simple:** straight to Plan Mode with the issue as context.
    - **Large feature in an existing capability:** a larger Phase 2 plan carries it; if it introduces a new business rule, merge the rule into the capability spec first (human approval).
-   - **New capability:** run `/interview-spec` to create its spec, then implement from it.
+   - **New capability:** run `/shape` to create its spec, `/spec-to-tickets` to break it into issues, then implement from the frontier.
 
    For the last two cases — anything with acceptance criteria — the recommended invocation is the **supervised `/goal`** from Part 3: the evaluator holds the run to evidence while your gates still fire. Plain Plan Mode / `/implement` remains right for the simple case.
 5. Named branch: `<stage>/<sub-area>/<issue-number>-<short-slug>`. E.g.: `<stage>/<sub-area>/142-<short-description>`.

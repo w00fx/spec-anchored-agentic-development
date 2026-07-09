@@ -5,7 +5,9 @@ argument-hint: [diff | branch | PR | path]
 
 Dispatch the `reviewer` agent via the Agent tool, in isolated context, on the
 target in the argument — the working-tree diff by default, or a branch, PR
-number, or path if given. Do NOT review it yourself in this session: the
+number, or path if given. Before dispatching, confirm the target resolves
+and the diff is non-empty — a bad ref or an empty diff should fail here,
+not inside parallel sub-agents. Do NOT review it yourself in this session: the
 independence of a fresh context that did not write the work is the point.
 
 Default — one reviewer: instruct it to load the applicable lenses per its

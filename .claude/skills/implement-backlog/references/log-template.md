@@ -30,6 +30,7 @@ not reconstructed at the end.
 
 ## Phase 3: Implement
 - Scope expansion attempts: [none / aborted with comment]
+- Replans: [none / delta summary — plan-review iteration N]
 - Files edited: [list]
 - Commits: [list of commit messages]
 
@@ -57,8 +58,11 @@ not reconstructed at the end.
 Field notes:
 - Every `Outcome: aborted` pairs with a **named blocker** posted as a
   comment on the issue (needs-refinement / scope-expansion-needed /
-  qa-blocked / review-blocked) — the terminal state the `/goal`
-  condition reads.
-- There are no `Replans` or `Disputed findings` fields here by design:
-  with no human mid-run to approve a replan or arbitrate a finding, the
-  autonomous skill aborts instead.
+  qa-blocked / review-blocked, plus Phase 1's scope-routing pair) —
+  the terminal state the `/goal` condition reads.
+- `Replans` — a Phase 3 → Phase 2 return, re-gated by the plan-review
+  subagent (the plan gate here is a machine, so no human is needed);
+  it counts against the same 3-iteration plan-review cap.
+- There is no `Disputed findings` field by design: arbitrating a
+  reviewer's finding requires a human, and this run has none — the
+  3-cap → `review-blocked` abort is the relief valve instead.

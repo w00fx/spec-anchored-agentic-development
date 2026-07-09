@@ -48,3 +48,27 @@ Field notes:
   review, not a routine skim.
 - **Human approval required: yes** also means applying the
   `human-approval-required` label (or the repo convention).
+
+## After opening — monitor until landed (autonomous runs)
+
+- **CI to completion**, not just the first green: a check can go
+  green then flip red as the full pipeline runs (the green-minute
+  rule) — wait for the pipeline to settle.
+- **Late comments.** From an *external review tool*: advisory — they
+  inform the human who approves the merge; the loop does not wait on
+  them, abort on them, or count them in the completion condition
+  (what gates is Phase 5 + CI; an external reviewer's precision is
+  not reliable enough to block). From a *human*: address them if in
+  scope; if they need a decision only a human can make, leave the PR
+  for human resolution and stop.
+- **Merge conflicts:** if the base branch moved, rebase/resolve and
+  re-run the QA gates (Phase 4 → Phase 5) — resolving a conflict is
+  a code change.
+- Something fixable in scope → fix and re-run the affected gates.
+  Out of scope or needing human judgment → comment on the PR/issue
+  naming exactly what blocks, and stop — never mark done around an
+  unresolved check.
+- Operationally: monitoring runs against the GitHub API; until
+  auto-merge by class exists (`AUTONOMY-PLAYBOOK.md`, Milestone 4), a
+  human merges — the run's job ends at "PR green, reviewed, nothing
+  outstanding." 

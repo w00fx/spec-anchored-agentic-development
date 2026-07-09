@@ -18,6 +18,13 @@
 
 ## Capability language
 
+<!-- Opinionated glossary, nothing else. Pick the canonical term and ban
+     the synonyms:
+       **Term**: what it IS (one-two sentences, not what it does).
+       _Avoid_: synonym1, synonym2
+     Only terms specific to this capability; no implementation details
+     (rules -> EARS, values -> reference table, decisions -> ADRs). -->
+
 <!-- Glossary of the terms used HERE and what each means in THIS capability.
      Flag terms that mean something different elsewhere ("Order" here vs "Order"
      in shipping). This is usually the least-inferable thing in the spec. -->

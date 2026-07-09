@@ -37,7 +37,7 @@ for ROOT in src app lib packages; do
       if [ ! -d "$ROOT/$CAP" ] && [ ! -d "specs/$CAP" ]; then
         {
           echo "Blocked: creating new capability folder '$ROOT/$CAP/' with no matching 'specs/$CAP/'."
-          echo "Spec-first: write the capability spec first (specs/$CAP/$CAP.md — see /interview-spec), then implement."
+          echo "Spec-first: write the capability spec first (specs/$CAP/$CAP.md — see /shape), then implement."
           echo "If '$CAP' is not a capability (an entity or layer folder), it fails package-by-feature — see .claude/rules/package-by-feature.md."
         } >&2
         exit 2

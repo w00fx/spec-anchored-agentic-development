@@ -159,7 +159,11 @@ In plan mode (read-only, no edits allowed):
    - What could break, especially cross-capability concerns.
    - What edge cases the resolved ambiguities now make explicit.
 3. Break the work into small, sequential changes.
-4. Identify which tests need to be written or updated.
+4. Identify which tests need to be written or updated — and the
+   **seam** they attach to: prefer an existing seam over a new one, the
+   highest seam that still isolates the behavior, ideally one for the
+   whole change. A good seam gives tests something durable to target,
+   so the code underneath can change without the tests moving.
 5. Map dependencies between steps — what must happen before what.
 6. Explicitly list the files you expect to edit. This is your committed
    scope for Phase 3.
@@ -186,14 +190,25 @@ out explicitly. Wait for explicit approval before proceeding to Phase 3.
    (or the issue's) — NOT on what the code happens to
    do. A test derived from the implementation confirms the implementation;
    it doesn't prove the behavior is correct. Cover the edge cases the
-   resolved ambiguities made explicit, not just the happy path.
+   resolved ambiguities made explicit, not just the happy path. Write
+   to the shared standard the reviewer will hold this work to:
+   `.claude/skills/general-code-review/references/test-standards.md`
+   (worked GOOD/BAD examples + the mocking boundary rule).
 3. Follow all rules in `.claude/rules/`.
-4. After each logical chunk — before writing the next one — run lint AND
+4. After each logical chunk — before writing the next one — run lint, typecheck, AND
    the tests covering the code you just touched. Do not write the next
-   chunk until both are green. Running checks every chunk (not batched at
+   chunk until all three are green. Running checks every chunk (not batched at
    the end) catches a break while it's still cheap to locate; batching
    turns one red bar into a bisecting session. Run the full suite in
    Phase 4 regardless.
+
+**Work branch — before the first edit or commit:**
+
+Create a work branch named by type — `feature/<slug>`, `fix/<slug>`,
+`refactor/<slug>`, `chore/<slug>`, `docs/<slug>` (or the repo's own
+convention), with the issue number when one exists
+(`fix/142-round-half-cent`). If the session is already on a dedicated
+work branch, stay on it. Never commit to the default branch.
 
 **Commits during implementation:**
 
@@ -299,6 +314,9 @@ exists to catch issues early, not to replace CI.
 Use the Agent tool to dispatch the `reviewer` agent in isolated context
 (it did not write this code — that independence is the point).
 
+Before any dispatch, confirm the diff is non-empty — an empty diff
+should fail here, not inside the reviewer.
+
 **Default — one reviewer, all applicable lenses:**
 
 - task: Run reviewer
@@ -349,7 +367,14 @@ reviewer, never parallelized.)
 **Wait for the review report(s).**
 
 **If issues found:**
-1. Fix the issues.
+1. Fix the issues — and each fix ships with a **regression test that
+   failed before the fix and passes after it**, when the finding is
+   test-shaped. A finding fixed without red-then-green is fixed by
+   claim, not by proof — and the class of bug the reviewer caught once
+   should be caught by the machine forever after. When a finding isn't
+   test-shaped (naming, structure, a comment), say so and note how it
+   was verified instead. Never invent a hollow test just to satisfy
+   this step.
 2. Go back to Phase 4 (tests) → Phase 5 (Code Review).
 3. Repeat until the review passes.
 
@@ -400,39 +425,24 @@ needed:
    status update (state transition, comment with PR link, close if
    applicable). If partially resolved, note remaining work.
 
-## Phase 7: Present Results
+## Phase 7: Open PR and Present Results
 
-Final report to the user:
+1. Push the work branch and open a PR. The description follows the
+   shared template in
+   `.claude/skills/implement-backlog/references/pr-template.md` —
+   adapt the log path to this skill's, and the spec field (local runs
+   may *update* the spec with human approval, not just propose). The
+   **Approved plan** section carries the Phase 2 plan plus any
+   approved replans, deltas, and scope expansions — it is what
+   `/explain` and future readers pull intent from.
+2. Report to the user in chat — short, because the PR description
+   carries the detail: the PR link, a one-paragraph scope summary,
+   the decisions that need their attention, and the human-approval
+   flag (e.g. "spec updated in this PR — needs your review before
+   merge").
 
-```markdown
-## Implementation Complete
-
-### Scope
-[What was done, mapped to spec section / issue / item]
-Scenario: [new capability / large feature / increment]
-
-### Files changed
-[List with brief description of each change]
-
-### QA Results
-- Tests: ✅ [N passed, 0 failed]
-- Code Review: ✅ [summary]
-
-### Loop closure
-- Lessons added: [yes/no, with summary]
-- Spec updated: [yes/no — if yes, summary of changes]
-- CLAUDE.md changes proposed: [yes/no, with summary]
-- Backlog/issue status: [updated/closed/N/A]
-
-### Human approval required
-[yes/no — reason, e.g. "spec updated, needs human PR review"]
-
-### Commits
-[List of commits with messages]
-
-### Log
-.claude/logs/implement-{timestamp}.md
-```
+Merging is the human's call: they are in the session, so there is no
+monitoring phase here — CI and late comments are watched together.
 
 ## Structured logging
 
