@@ -9,7 +9,7 @@ grow technical-layer folders (`controllers/`, `services/`, `repositories/`,
 
 Before creating a NEW top-level folder, all three tests must pass:
 
-- Name is a business verb/outcome (`payments/`, `onboarding/`) — not a data
+- Name is a recognizable business responsibility/outcome (grammar class is irrelevant — `payments/` and `orders/` qualify) (`payments/`, `onboarding/`) — not a data
   noun (`customer/`, `invoice/`).
 - It is a vertical slice: it will hold that capability's rules, use cases,
   and persistence — not one horizontal layer of an entity.
