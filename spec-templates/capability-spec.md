@@ -1,3 +1,17 @@
+---
+# Authority & lifecycle (SA-001): human authority, not necessarily human authorship
+schema_version: 1
+capability_id: CAP-<NAME>
+status: draft        # lifecycle metadata: draft → ratified → superseded
+owner: <domain-owner>
+# Authority (Option A): the protected-branch PR merge IS the approval
+# record — Git carries author, reviewers, and revision. The fields
+# below are informative mirrors, never a gate:
+approved_by: <human>
+approved_at: <date>
+provenance: <shape-session / supersedes-revision>
+---
+
 # Capability: <name>
 
 <!-- One spec per capability. PERMANENT: it is the business source of truth for
@@ -33,14 +47,24 @@
 |------|--------------|
 |      |              |
 
-## Business rules (EARS)
+## Normative behavior (EARS as the default form)
 
-<!-- One rule per line, in EARS form (Easy Approach to Requirements Syntax,
-     Mavin et al., Rolls-Royce) — imperative and testable. When a rule
-     derives from an external source, cite it: identifier + version + scope.
-     For calculation rules, EARS states the policy and cites the source;
-     the numbers live in the reference-value table under Acceptance
-     criteria (they become the golden).
+Each rule is a heading with a stable typed ID — `### BR-<CAP>-001 —
+<name>` — never renumbered; retired, not deleted. Tickets, tests, and
+reviews point at these IDs.
+
+### BR-<CAP>-001 — <name>
+
+WHEN <trigger>, the system SHALL <observable behavior>. *(Source:
+<identifier + version + scope> when derived from an external rule.)*
+
+<!-- Representation by truth type — EARS is the default for event/state
+     responses, not a universal container: combination of conditions →
+     decision table; lifecycle → state model; calculation → formula +
+     units + rounding + oracle (the numbers live in the reference-value
+     table and become the golden); data shape → schema; invariant →
+     property; measurable quality → QC-* with limit + method. Every
+     item, whatever its representation, carries its typed ID as heading.
      EARS patterns:
        "The system SHALL <x>."
        "WHEN <trigger>, the system SHALL <x>."
@@ -53,8 +77,18 @@
 
 ## Acceptance criteria (Given / When / Then)
 
-<!-- Binary pass/fail. Each criterion is a scenario a test can verify — this is
-     what lets the model "cook" and what an autonomous /goal checks against.
+Each criterion is a heading with a stable typed ID — `### AC-<CAP>-001
+— <name>` — same rules as BR IDs; `AC verifies BR-…` is stated where
+the relation exists.
+
+### AC-<CAP>-001 — <name> *(verifies BR-<CAP>-001)*
+
+GIVEN <state> WHEN <action> THEN <observable outcome with values>.
+
+<!-- Binary pass/fail. Each criterion is a scenario its declared verification
+     method can check (test by default; static check, schema validation,
+     benchmark, inspection, or runtime observation where the truth type
+     demands it) — tool-neutral, and what lets the model "cook".
      For a calculation, anchor on reference values (input -> expected output),
      which become the golden the implementation is tested against. -->
 
@@ -80,8 +114,45 @@
 - **Input:** <from which capability> — see `contracts/<x>`
 - **Output:** <to which capability> — see `contracts/<y>`
 
+<!-- Failure siblings: event/response contracts declare the failure case
+     alongside success (Created => CreateRejected) — a contract that only
+     describes success describes half a system, the half that doesn't
+     ping you. (Source #37) -->
+
+<!-- Access policies are contract material too: declare who may call what
+     next to the endpoint it protects, generate the enforcement, and fail
+     closed — an undeclared policy means denied. A security audit should be
+     reading this file, not fifty resolvers. (Source #37) -->
+
+## Observability
+
+The events and metrics that prove this capability works in
+production — named here because runtime truth deserves an address
+too (a field promoted from the ticket checklist, source #48; the
+runtime-only bug class, source #50):
+
+- **Events:** what the capability emits when it succeeds and when it
+  rejects (mirror the failure siblings above).
+- **Metrics:** the one or two signals a human would check to answer
+  "is this working for real users?"
+- These land in tickets as instrumentation criteria. **The presence
+  and correctness of instrumentation can be an acceptance criterion
+  and a merge gate; the production outcome never is** — outcomes are
+  rollout/promotion signals feeding lessons and spec deltas.
+
 ## Dependencies
 
 <!-- Other capabilities this one depends on, and the nature (upstream/downstream). -->
 
 -
+
+## Open questions
+
+Unresolved gaps live here — never invented defaults. Lifecycle:
+`open → resolved-by BR/AC/CTR → retired` (an OQ never silently
+disappears; its resolution names the ID that answered it).
+
+- **OQ-<CAP>-001 — <question>**
+  - Why unresolved: …
+  - Decision needed from: …
+  - Blocks: …
