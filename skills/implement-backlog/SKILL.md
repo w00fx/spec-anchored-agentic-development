@@ -13,7 +13,9 @@ description: >-
 # implement-backlog — unattended adapter
 
 **Phase 0 first action: read `.claude/protocols/implementation-protocol.md`
-NOW.** It is the state machine; this file configures the gates for a
+NOW.** (Installed at user level, the same file sits under your `~/.claude`;
+the Codex port reads it from `agent-system/protocols/`. If none of the three
+resolves, that is a NAMED_BLOCKER — never run the machine from memory.) It is the state machine; this file configures the gates for a
 headless run — no human answers mid-flight, so every gate either has a
 mechanical provider or aborts.
 
