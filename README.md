@@ -4,7 +4,7 @@
 > A methodology, and a ready-to-install bundle, for building software with AI coding agents:
 > from a single spec file to supervised autonomy.
 
-This repository is my agentic development workflow. It is both a **guideline** (how to work) and an **installable bundle** (the skills, commands, agents, rules, routines, and templates that make a coding agent actually work this way). It targets Claude Code but the specs-and-context layer is portable to any coding agent (Codex, Cursor, Kiro, OpenCode).
+This repository is my agentic development workflow. It is both a **guideline** (how to work) and an **installable bundle** (the protocol, skills, commands, agents, rules, policies, routines, executable contracts and templates that make a coding agent actually work this way). It targets Claude Code, but the specs-and-context layer is portable to any coding agent, and `adaptations/` maps the rest onto Codex and Kiro.
 
 It is maintained as a living reference — when practice conflicts with what's written here, the document is updated, not silently worked around.
 
@@ -42,7 +42,7 @@ Identify capabilities → Specification → Development
 
 ## Autonomy is a gradient, not a switch
 
-The narrow start needs no formal eval suite: issues → hard-coded allowlist of trivial classes → **CI green mandatory** → PR → **a human approving every PR**. Widening — more classes, more volume, any step toward auto-merge — requires a regression suite with a track record. Normative calculations never enter autonomy before golden/conformance verification exists. The four-Milestone widening path (Tier 1 static gates, Tier 2 dynamic validation, per-class auto-merge) lives in [`AUTONOMY-PLAYBOOK.md`](AUTONOMY-PLAYBOOK.md).
+The narrow start needs no formal eval suite: issues → hard-coded allowlist of trivial classes → **CI green mandatory** → PR → **a human approving every PR** — over a safety baseline that cannot wait (branch protection, scoped credentials, no direct push, one issue → one PR, named blockers, human merge). Widening — more classes, more volume, any step toward auto-merge — requires a regression suite with a track record. Normative calculations never enter autonomy before golden/conformance verification exists. The widening path lives in [`AUTONOMY-PLAYBOOK.md`](AUTONOMY-PLAYBOOK.md), which splits the last step honestly: **M4a** is machine *approval eligibility* (the human still merges); **M4b** is platform auto-merge, a much higher bar.
 
 ---
 
@@ -53,60 +53,97 @@ The narrow start needs no formal eval suite: issues → hard-coded allowlist of 
 | File | What it is |
 |------|------------|
 | [`GUIDELINE.md`](GUIDELINE.md) | The source of truth for **how to work** — the full methodology, Parts 1–7. Read this first. |
-| [`AUTONOMY-PLAYBOOK.md`](AUTONOMY-PLAYBOOK.md) | The widening path of autonomy: the four Milestones, Tier 1/2 validation, per-class auto-merge. Read when ready to widen. |
+| [`AUTONOMY-PLAYBOOK.md`](AUTONOMY-PLAYBOOK.md) | The widening path of autonomy: the Milestones, Tier 1/2 validation, per-class approval eligibility. Read when ready to widen. |
 | [`INSTALL.md`](INSTALL.md) | Where each bundle file goes and the recommended order of adoption. |
+| [`EVALS.template.md`](EVALS.template.md) | The eval-case schema and the initial case index — copy to `EVALS.md` when you start qualifying. |
 | [`sources-and-learnings.md`](sources-and-learnings.md) | Every external source mined while designing the methodology, what each contributed, what was rejected and why — the audit trail of *why the system is the way it is*. |
 | [`CLAUDE-codebase-exploration-block.md`](CLAUDE-codebase-exploration-block.md) | A codebase-exploration block to paste into your root context file (example tool stack — swap in yours). |
+| [`adaptations/`](adaptations/) | Running the system elsewhere: `kiro.md`, `codex.md` (harness-class peer, near-1:1 port), and `claude-plus-codex.md` (both harnesses on one repo). |
 
-### The bundle (drop into `.claude/` and `specs/`)
+### The protocol and its three adapters
+
+One state machine, three modes. `protocols/implementation-protocol.md` holds phases 0–9, the terminal taxonomy, the invariants and the logging; each skill is a **mode adapter** that declares only *who satisfies each gate*.
 
 | Path | What it is |
 |------|------------|
-| `skills/implement-feature/` | **Local** 7-phase workflow with human confirmation gates (interactive; plain or supervised `/goal`, never headless). |
-| `skills/implement-backlog/` | **Autonomous** workflow with named-blocker aborts; runs under headless `/goal`. Its `references/` carry the shared PR playbook and the rationalizations table. |
-| `skills/plan-review/` | Reviewer criteria: plan approach soundness (incl. the capability-vs-entity test for new folders). |
-| `skills/general-code-review/` | Reviewer criteria: correctness, simplicity/reuse, test quality, type design — the default lens. Its `references/` carry the shared test bar and the twelve-smell baseline. |
-| `skills/constitution-compliance-review/` | Contextual reviewer criteria: the project constitution (numeric types, audit trail, source citation, stage boundaries, past-period rules). |
-| `skills/conformance-review/` | Contextual reviewer criteria: diff vs capability spec, and diff vs approved plan. |
-| `agents/reviewer.md` | The independent reviewer agent — a **router** that loads the criteria skills that fit what it's handed and reports findings; it never edits. |
-| `commands/implement.md` | Local entry point → `implement-feature`. |
-| `commands/review.md` | On-demand reviewer, report-only. |
-| `commands/explain.md` | Post-implementation walkthrough → `docs/walkthroughs/`. |
-| `commands/shape.md` | Work-shaping interview: a spec from an idea, transcript, or existing code; grill-back refinement of an existing spec; task sharpening. One question at a time, always with a recommended answer. |
-| `commands/spec-to-tickets.md` | Breaks a committed spec into tracer-bullet tickets with blocking edges; quizzes the human before publishing to `tickets.md` or GitHub Issues. |
-| `commands/plan-from-issue.md` | Phased implementation plan from a GitHub issue (Plan Mode; no implementation). |
+| `protocols/implementation-protocol.md` | The shared state machine — preflight, proven delta, understand, plan, implement, verify, durable sync, seal, review, deliver. Terminals: `PR_READY_AWAITING_HUMAN`, `NAMED_BLOCKER`, `NO_CHANGE_REQUIRED`. A run never claims the merge. |
+| `protocols/references/scope-manifest-schema.md` | The run's mechanical-scope proposal: allowed and denied paths, permissions, typed truth grants. |
+| `protocols/references/review-target-schema.md` | Review target and seal schemas — the candidate the reviewer judged is the candidate that ships. |
+| `skills/implement-feature/` | **Supervised-local** adapter — the human satisfies every gate in-session. |
+| `skills/implement-orchestrated/` | **Orchestrated-worker** adapter — one ticket, one worktree, one PR; gates satisfied through GitHub. |
+| `skills/implement-backlog/` | **Unattended** adapter — every gate has a mechanical provider or aborts as a named blocker. |
+
+### The review lenses and the reviewer
+
+| Path | What it is |
+|------|------------|
+| `agents/reviewer.md` | The fresh-context reviewer — pinned to the strong model at max effort, run in a disposable worktree with no push credentials, loading the lenses that fit what it's handed. It reports; it never edits. |
+| `skills/plan-review/` | Lens: approach soundness before code. |
+| `skills/general-code-review/` | Lens: correctness, simplicity/reuse, test quality, type design — the default. Its `references/` carry the shared test bar and the smell baseline. |
+| `skills/constitution-compliance-review/` | Lens: the project constitution (numeric types, audit trail, source citation, stage boundaries). |
+| `skills/conformance-review/` | Lens: diff vs capability spec, and diff vs the approved plan. |
+| `skills/ticket-readiness-review/` | Lens: the ticket as an executable contract, before a worker is ever dispatched. |
+
+### Commands
+
+| Path | What it is |
+|------|------------|
+| `commands/shape.md` | The work-shaping interview — an idea, a transcript, existing code, or an existing spec. The interview only. |
+| `commands/to-spec.md` | Writes or updates the capability spec from that interview. Never interviews back; gaps become open questions. |
+| `commands/spec-to-tickets.md` | Breaks a ratified spec into tracer-bullet tickets with explicit blocking edges; quizzes the human before publishing. |
+| `commands/prep.md` | One-time repository prep: the `check` / `check-<capability>` / `golden` interface, the metric-class gates, the golden harness, minimum CI, the ratchet baseline. |
+| `commands/orchestrate.md` | Whole-project orchestration in resolution-gated waves over the explicit issue graph — one worker per ticket, a fingerprinted CI-and-review monitor, and the human merging every PR. |
+| `commands/plan-from-issue.md` | Phased implementation plan from a GitHub issue (no implementation). |
+| `commands/review.md` | On-demand reviewer dispatch, report-only. |
 | `commands/review-spec-drift.md` | Periodic whole-capability spec ↔ code drift audit. |
-| `rules/package-by-feature.md` | Always-loaded rule: the capability-vs-entity tests applied at file-creation time. |
+| `commands/explain.md` | Post-implementation walkthrough → `docs/walkthroughs/`. |
+| `commands/implement.md` | Discoverability redirect — the transactional adapters are user-invocation-only, so it points you at the direct invocation. |
+
+### Authorization, contracts and the gate
+
+| Path | What it is |
+|------|------------|
+| `scripts/spec-anchored` | **Executable contracts**, dependency-free and fail-closed: canonicalization, the APPROVAL-FINGERPRINT over the approval bundle, scope validation under a policy floor, and the strict terminal union. Doctrine that used to be prose, as code that refuses. |
+| `policy/` | The **authorization floor** — four versioned profiles plus the instances a launcher issues. A worker never writes one, and `validate-scope` refuses to judge a diff without one. |
+| `rules/truth-layer.md` | Always-loaded rule: `specs/**`, the golden tests and the ratchet baseline are read-only outside their named flows. |
+| `rules/package-by-feature.md` | Always-loaded rule: the capability-vs-entity tests, applied at file-creation time. |
 | `hooks/require-spec-for-new-capability.sh` | Opt-in poka-yoke hook: blocks a new `src/<x>/` without a matching `specs/<x>/`. |
-| `routines/frontier-worker.md` | Canonical scheduled-Routine prompt: scan the frontier, claim one issue, run the headless `/goal`. |
-| `spec-templates/capability-spec.md` | **The** spec template — one type, permanent (EARS rules + Given/When/Then criteria + reference values). |
+| `routines/frontier-worker.md` | Launcher routine: scan the frontier, claim one issue under a lease, spawn the child session, validate the structured terminal from outside the transcript. |
+| `spec-templates/capability-spec.md` | **The** spec template — one type, permanent: authority frontmatter, normative behavior by truth type, Given/When/Then criteria, reference values, and typed stable IDs throughout. |
+| `scripts/check-all.sh` | **The single gate.** Compiles the artifacts, parses every shell script, runs the structural validator and all four suites, and checks the Codex port for drift. |
+| `tests/` | 308 fixtures — kernel contracts, adversarial bypasses, corpus fixtures — plus mutation adequacy: 52 injected regressions, each of which a fixture must catch. |
 
-## The two workflows
+## The three modes
 
-Both run the same **Plan → Implement → QA → Close the loop** cycle; they differ in who holds the gate.
+All three run the same protocol. They differ only in who answers.
 
-- **`implement-feature`** (local, human-driven) — seven phases with human confirmation gates after Understand, Resolve-ambiguities, and Plan. A question at a gate pauses the turn. Recommended invocation for anything with acceptance criteria: a **supervised `/goal`** that keeps the human gates *and* stops the worker from declaring itself done — a fresh evaluator re-checks the completion condition against the transcript each turn, demanding evidence rather than claims.
+- **`implement-feature`** — local and interactive. You resolve ambiguity, you approve the plan (and its APPROVAL-FINGERPRINT), you approve any scope change; a semantic amendment to a spec is possible here, behind an explicit in-session gate, and the PR ratifies it.
 
-- **`implement-backlog`** (autonomous, agent-driven) — the persistence engine is Claude Code's native `/goal`; a thin GitHub Action runs it headless on an `auto-implement` label, or a scheduled Routine works the frontier (`routines/frontier-worker.md`). There is no one to answer a gate, so every would-be question becomes a **named-blocker abort** (needs-refinement, scope-expansion-needed, qa-blocked, review-blocked, plus the scope-routing pair wrong-skill / needs-human-implementation) and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after. Scope is restricted to increments; new capabilities and large features route back to `implement-feature`.
+- **`implement-orchestrated`** — one autonomous worker per ticket, dispatched by `/orchestrate` into its own worktree. Its gates live on GitHub: the plan is posted as an issue comment and the run **stops** until a human replies `approved <fingerprint>`; ambiguity is a comment plus a label, never a guess.
 
-Review (Phase 5, and the autonomous plan gate) is never inlined — it dispatches the independent `reviewer` agent in isolated context that did **not** write the work under review, because a fresh context doesn't share the author's blind spots.
+- **`implement-backlog`** — headless. No one is there to answer, so every gate has a mechanical provider or aborts with a named blocker (`AMBIGUITY`, `MISSING_ORACLE`, `TRUTH_CONFLICT`, `SCOPE_VIOLATION`, `SPEC_CHANGE_REQUIRED`, `SPEC_STALE`, `GRAPH_DECISION_REQUIRED`, `ENVIRONMENT`, `REPEATED_FAILURE`). Scope is increments only; new capabilities and large features stay human-led.
+
+Two things hold across all three. The review (protocol Phase 8) is never inlined — it goes to a reviewer that did **not** write the work, because context separation removes authoring carryover. And no run ever merges: every mode ends at `PR_READY_AWAITING_HUMAN`, and a human decides.
 
 ## Installation
 
-See [`INSTALL.md`](INSTALL.md). In short: copy the bundle folders into your repository's `.claude/` (or `~/.claude/`), the spec template into `specs/_template/`, keep `specs/` and `docs/` centralized, and put a `CLAUDE.md`/`AGENTS.md` next to each capability's code pointing at its spec. Then:
+See [`INSTALL.md`](INSTALL.md). In short: copy the bundle folders into your repository's `.claude/`, keep `specs/`, `docs/` and the policy artifacts where the whole team can read them, and put a `CLAUDE.md`/`AGENTS.md` next to each capability's code pointing at its spec. Then:
 
 1. Read [`GUIDELINE.md`](GUIDELINE.md). The floor is **one spec file** — start there.
-2. Shape the first capability spec with `/shape` (it writes from the template); add the constitution when invariant rules demand it. When the spec is ready, `/spec-to-tickets` breaks it into tracer-bullet issues.
-3. Run the first feature locally with a **supervised `/goal`** wrapping `implement-feature`.
-4. Use `/explain` afterward.
-5. Turn on autonomous mode narrow (allowlist + green CI + human approving every PR); widen only as your eval suite earns trust.
+2. Run `/prep` once so the repository has the three-command verification interface, the metric-class gates and the ratchet baseline. Verification is what everything else stands on.
+3. Shape the first capability spec with `/shape`, write it with `/to-spec`, and let a human ratify it by merging its own PR. Add the constitution when invariant rules demand it.
+4. `/spec-to-tickets` breaks the ratified spec into tracer-bullet issues with explicit blocking edges.
+5. Run the first slice locally with `/implement-feature`, then `/explain` afterward.
+6. Turn on autonomous mode narrow (allowlist + green CI + a human approving every PR); widen only as your eval suite earns trust.
 
 ## Portability
 
 The methodology has two layers that travel differently:
 
 - **Specs and context** (Parts 1–2 of the guideline) — capabilities, specs, the `AGENTS.md`/`CLAUDE.md` files, the constitution. **Tool-portable**: any coding agent reads them.
-- **Automation** (Parts 3–5) — the implementation skills, the reviewer, `/goal`, the autonomy trajectory. **Implemented for Claude Code**; in another tool, map each piece to its equivalent (`/goal` → that tool's loop primitive, skills → its agent/workflow definitions, `.claude/rules/` → its always-loaded rules).
+- **Automation** (Parts 3–5) — the shared protocol and its adapters, the reviewer, the launchers, the autonomy trajectory. **Implemented for Claude Code**; `adaptations/` maps each piece onto Codex (a near-1:1 port, since skills and `AGENTS.md` are open formats) and Kiro, and documents what does not survive the trip.
+
+The executable contracts under `scripts/` are deliberately tool-neutral: dependency-free Python over plain JSON, so any harness can compute the same fingerprint and any CI can recompute the same verdict.
 
 ## License
 
