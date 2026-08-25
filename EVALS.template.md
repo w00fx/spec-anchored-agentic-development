@@ -33,8 +33,8 @@ overall reputation.
 
 ## Unit-level coverage already in the bundle
 
-`tests/test-contracts.py` (55 checks) and
-`tests/test_adversarial_contracts.py` (30 adversarial fixtures), both
+`tests/test_kernel_contracts.py` (61 checks) and
+`tests/test_kernel_adversarial.py` (202 adversarial fixtures), both
 run by `bash scripts/check-all.sh`, cover the *pure-function* share of
 EVAL-004 (approval mutation matrix), 007 (post-approval scope drift),
 019 (validator negatives, one per retired form) and the terminal-schema

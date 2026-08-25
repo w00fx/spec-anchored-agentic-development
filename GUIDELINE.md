@@ -228,9 +228,10 @@ project/
 │   ├── <norm-reference>.md
 │   └── walkthroughs/                  ← /explain output: one walkthrough per implemented feature
 │
+├── spec-templates/
+│   └── capability-spec.md             ← the spec template (permanent; one per capability)
+│
 ├── specs/                             ← CENTRALIZED (domain source of truth) · read by conformance-review
-│   ├── _template/
-│   │   └── capability-spec.md         ← the spec template (permanent; one per capability)
 │   ├── <capability-1>/                   ← mirrors src/<capability-1>/
 │   │   ├── <capability-1>.md             ← the spec
 │   │   └── contracts/
@@ -597,7 +598,7 @@ Saved in `.claude/commands/`. Versioned in the repo.
 
 **`/prep.md`** — one-time repository preparation: the three-command verification interface (`check` / `check-<capability>` / `golden`), the metric-class gates (stack-agnostic: the class is the requirement, the tool an instance; absence = named blocker), the golden harness skeleton reading `specs/<cap>/tables/`, minimum CI as visible checks, and the ratchet baseline (grandfather the count; it only shrinks). Brownfield-safe, proven by running. Ships in the bundle.
 
-**`/orchestrate.md`** — full-project orchestration in **resolution-gated waves** (the gkpacker field pattern, source #48, adapted): wave table from the explicit `Blocked by` graph; one worker per ticket in child worktrees cut from fresh, verified `origin/main`; persistent monitor with CI and review **fingerprints** (new feedback revokes review-ready — CI green is not the whole gate); reviewer-triage taxonomy for humans, bots, and agents; applicable-lens review on every PR; human merges gate each wave. Orca mechanism loaded at runtime (`ORCA skills get orchestration --full`); baked-in defaults never re-asked; caps, question policy, and the 2-consecutive halt built in. Ships in the bundle.
+**`/orchestrate.md`** — full-project orchestration in **resolution-gated waves** (the gkpacker field pattern, source #48, adapted): wave table from the explicit `Blocked by` graph; one worker per ticket in child worktrees cut from fresh, verified `origin/main`; persistent monitor with CI and review **fingerprints** (new feedback revokes review-ready — CI green is not the whole gate); reviewer-triage taxonomy for humans, bots, and agents; applicable-lens review on every PR; human merges gate each wave. Orca mechanism loaded at runtime (`ORCA skills get orca-cli`); baked-in defaults never re-asked; caps, question policy, and the 2-consecutive halt built in. Ships in the bundle.
 
 **`/spec-to-tickets.md`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's pointed stable IDs, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
 

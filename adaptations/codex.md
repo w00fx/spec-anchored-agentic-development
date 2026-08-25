@@ -49,7 +49,7 @@ are **already in the format Codex reads** — they install under
 | Routines | **Codex Cloud** — background parallel tasks producing PRs (experimental; verify maturity) |
 | Run logs / evidence trail | `codex exec --json`, session logs, the auditable instruction chain |
 | `/goal` | Exists (flag-gated at launch, GA per mid-2026 reports) — evidence-based completion **by template**, self-audited: see limitation 1 |
-| `/advisor` | No equivalent — Codex's culture is the inverse (cheap models for the grind, e.g. a mini for subagent fan-out) |
+| `/advisor` (a Claude Code harness feature this system leans on, not a bundle command) | No equivalent — Codex's culture is the inverse (cheap models for the grind, e.g. a mini for subagent fan-out) |
 | — | Bonus primitive we lack natively: managed **auto-review** on PRs |
 
 ## The three concentrations of difference

@@ -94,5 +94,5 @@ a truncated record is a violation, never "no changes".
 
 Scope enforcement runs **before review**: an unauthorized path fails
 the candidate, whatever tool wrote it. Fixtures live in
-`tests/test_adversarial_contracts.py`, and `tests/test-mutants.py`
+`tests/test_kernel_adversarial.py`, and `tests/test-mutants.py`
 proves those fixtures actually fail when a rule is removed.
