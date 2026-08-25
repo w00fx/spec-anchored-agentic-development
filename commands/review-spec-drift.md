@@ -1,6 +1,6 @@
 ---
 description: Checks drift between specs and implementation
-argument-hint: [capability name]
+argument-hint: "[capability name]"
 ---
 
 For the capability in the argument (or the current one if omitted):
@@ -17,3 +17,6 @@ For the capability in the argument (or the current one if omitted):
    - Cosmetic drift (update spec)
 
 Don't fix anything. Just report.
+
+Portability: this command's body works as a standalone prompt in any
+harness — the semantic procedure is portable; invocation, permissions, and context loading need the harness adapter.

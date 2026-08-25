@@ -6,7 +6,7 @@
 
 Permanent reference.
 
-> This document is the source of truth for **how to work**. If something conflicts with practice, update this document — don't invent silent exceptions.
+> This document is the **doctrine**: concepts, responsibilities, policies. The executable state machine is `.claude/protocols/implementation-protocol.md` — phases 0–9, terminals, gates — and the three mode adapters (`implement-feature` supervised, `implement-orchestrated` worker, `implement-backlog` unattended) declare who satisfies each gate. **On any conflict about execution, the protocol wins**; on any conflict about intent, this document wins — and either conflict is a bug to fix, never a silent exception.
 
 > **Companion documents**: `AUTONOMY-PLAYBOOK.md` covers the widening path of autonomy (the four Milestones, Tier 1/2 validation, per-class auto-merge). `EVALS.md` is your project's eval-suite artifact — required to *widen* autonomy, not to start it narrow (Part 5).
 
@@ -34,9 +34,9 @@ Identify capabilities → Specification → Development
                           Operational maturity → Autonomy (narrow start → widening)
 ```
 
-A **capability** is a cohesive slice of what the system *does* for the business — payments, orders, notifications, billing. Not a technical layer (controller, repository), not an isolated entity (Product, Customer), not a mechanism (cache, queue). It is naturally bounded, which is why specs are written around it. (When a capability has a clear linguistic boundary — the same word means different things on each side — it is what some methodologies call a *bounded context*; that vocabulary is optional, and you don't need it to recognize that payments ≠ orders.)
+A **capability** is a cohesive slice of what the system *does* for the business — payments, orders, notifications, billing. Not a technical layer (controller, repository), not an isolated entity (Product, Customer), not a mechanism (cache, queue). It is naturally bounded, which is why specs are written around it. (When a capability has a clear linguistic boundary — the same word means different things on each side — its relation to what some methodologies call a *bounded context* is **mapped, not presumed** — a capability can span contexts, a context can host several capabilities; the vocabulary is optional, and you don't need it to recognize that payments ≠ orders.)
 
-**Where this sits in the field.** A taxonomy is consolidating (arXiv's "Spec-Driven Development: From Code to Contract", 2026; echoed in the martinfowler.com *exploring-gen-ai* series) with three levels of rigor inside spec-driven development: **spec-first** — the spec precedes the code but may drift or be discarded afterwards; **spec-anchored** — the spec is permanent and the code answers to it continuously; **spec-as-source** — code is generated or derived from the spec. Tools like Kiro and Spec Kit are spec-first: per-feature specs that guide the work, then become history. This guideline is **spec-anchored by construction** — one permanent spec per capability, drift treated as a bug, conformance checked value by value — and, for normative rules, moves toward as-source: the spec's reference values generate the golden tests that act as the oracle.
+**Where this sits in the field.** A taxonomy is consolidating (arXiv's "Spec-Driven Development: From Code to Contract", 2026; echoed in the martinfowler.com *exploring-gen-ai* series) with three levels of rigor inside spec-driven development: **spec-first** — the spec precedes the code but may drift or be discarded afterwards; **spec-anchored** — the spec is permanent and the code answers to it continuously; **spec-as-source** — code is generated or derived from the spec. Kiro and Spec Kit default to spec-first per-feature flows, though both document living-spec / continuous-refinement modes; the difference here is not "they discard, we keep" but that this system **hardens** the living-spec end — permanent per-capability authority, ratification, stable IDs, conformance gates. This guideline is **spec-anchored by construction** — one permanent spec per capability, drift treated as a bug, conformance checked value by value — and, for normative rules, moves toward as-source: the spec's reference values generate the golden tests that act as the oracle. An adaptation map for running this system on Kiro — the translation table, the execution-layer mapping, and the three limitations — ships in the bundle (`adaptations/` — `kiro.md`; `codex.md` for the harness-class peer; `claude-plus-codex.md` for running both on one repo).
 
 The document structure mirrors the trajectory:
 
@@ -59,23 +59,23 @@ The document structure mirrors the trajectory:
 **Two layers, different portability.** This guideline has two layers, and they travel differently across tools:
 
 - **Specs and context (Parts 1-2)** — capabilities, specs, the `AGENTS.md`/`CLAUDE.md` files, the constitution. This layer is **tool-portable**: any coding agent (Claude Code, Codex, Kiro, OpenCode, Cursor) reads the same specs and context files.
-- **Automation (Parts 3-5)** — the implementation skills, the reviewer, `/goal`, the autonomy trajectory. This layer is **implemented in Claude Code**; the concepts are general, the mechanism is Claude Code's. In another tool, map each piece to its equivalent.
+- **Automation (Parts 3-5)** — the shared implementation protocol and its three mode adapters, the decorrelated reviewer, the launchers, the autonomy trajectory. This layer is **implemented in Claude Code**; the concepts are general, the mechanism is Claude Code's. In another tool, map each piece to its equivalent.
 
 The pieces of the automation layer, in plain terms:
 
 - **skill** — an agent with a procedure: a workflow the model runs end to end (plan → implement → test → review).
 - **`AGENTS.md`/`CLAUDE.md`** — the rules and conventions the agent loads (see the note in Part 2).
-- **`/goal`** — a loop that re-runs until the acceptance criteria are met, with a fresh model checking the condition each turn (maker-checker).
+- **The launcher** — whatever starts a run and validates its structured terminal from outside the transcript (a person typing the invocation, a GitHub Action, a Routine). (`/goal`, Claude Code's session-scoped completion re-check, is an optional composition on top of a run — Part 3; never the engine and never a loader.)
 - **reviewer** — a separate agent that checks the work and reports findings; it never writes.
 - **`.claude/rules/`** — invariant rules loaded every session.
 
-In another tool, `/goal` becomes that tool's loop/automation primitive, skills become its agent/workflow definitions, and `.claude/rules/` becomes its always-loaded rules file. The specs and `AGENTS.md`/`CLAUDE.md` don't change.
+In another tool, the launcher becomes that tool's automation primitive, skills become its agent/workflow definitions, and `.claude/rules/` becomes its always-loaded rules file. The specs and `AGENTS.md`/`CLAUDE.md` don't change.
 
 ---
 
 ## Part 1 — Project start: identifying capabilities, the spec before the code
 
-The business structure comes before the code. You don't discover architecture via vibe coding — you identify the capabilities deliberately (lightweight), specify them, and then develop. What does NOT come on day 1 is the full operational machinery (extensive rules, autonomous routines, the widening of autonomy) — that evolves as the project matures. But knowing your capabilities and their boundaries is the starting point.
+The business structure comes before the code. You don't discover architecture via vibe coding — you identify the capabilities deliberately (lightweight), specify them, and then develop. The precise rule: **architectural decisions are neither originated nor ratified autonomously; implementing a ratified decision is decomposable into tickets** — origin of authority is human, tracking of work is normal backlog. What does NOT come on day 1 is the full operational machinery (extensive rules, autonomous routines, the widening of autonomy) — that evolves as the project matures. But knowing your capabilities and their boundaries is the starting point.
 
 Greenfield: identify the capabilities before the project. Brownfield: map the existing system's seams before applying the rest.
 
@@ -95,7 +95,7 @@ Before writing production code, you need to know the **capabilities** the system
 
 **When the boundary is not obvious, mine the evidence** (especially in a large existing codebase, where intended and real boundaries diverge):
 
-- **Co-change / change-coupling** (git history) — files that always change together belong together; a module that changes for N unrelated reasons hides N boundaries.
+- **Co-change / change-coupling** (git history) — frequent co-change is **evidence to investigate a boundary, not a verdict**: triangulate with language, dependencies, and ownership. A module that changes for N unrelated reasons hides N boundaries.
 - **Dependency-graph clustering** — clusters of high internal coupling with a thin interface between them (tools: `dependency-cruiser`, ArchUnit, Service Cutter).
 
 For genuinely complex domains where boundaries resist these heuristics, deeper modeling techniques (Event Storming, subdomain analysis) are available — but they are an **escalation for hard cases, not the starting point.**
@@ -126,7 +126,7 @@ The spec captures the known business source of truth: domain rules, edge cases, 
 From the specs, implementation via skills (`implement-feature` — see Part 3).
 
 - Each capability is implemented from its spec.
-- A large feature within an existing capability is carried by a larger Phase 2 plan; any new business rule it introduces is merged into the capability spec (permanent).
+- A large feature within an existing capability starts as a spec delta (`/shape` against the existing spec) merged at the gate before any code — any new business rule it introduces lands in the capability spec (permanent) as PR 1; `/spec-to-tickets` then breaks it into frontier slices, each carried by its own normal-sized plan (protocol Phase 3).
 - Implementation is incremental: one capability at a time, by priority. The map from Stage 0 covers the boundaries you could already justify; the ambiguous middle splits when evidence forces it, and construction is phased either way.
 - Refinement of capability boundaries/spec as insight emerges, always with the `requires_human_approval` flag — because a change in a boundary or domain rule is a business change, and business needs a human eye.
 
@@ -141,7 +141,7 @@ A dimension orthogonal to the stages above. Even spec-anchored, a freshly starte
 - Coverage threshold per capability (not global)
 - Green build as a merge prerequisite
 
-Deeper code evaluations (complexity, duplication, dependency structure, mutation testing, security checks) enter gradually as autonomy widens (Tier 1 — see `AUTONOMY-PLAYBOOK.md`); they are not a prerequisite for the operational base.
+Deeper code evaluations (complexity, duplication, dependency structure, mutation testing, security checks) enter gradually as autonomy widens (Tier 1 — see `AUTONOMY-PLAYBOOK.md`); they are not a prerequisite for the operational base. **Adopt gates as ratchets where brownfield resists:** ban new violations, grandfather the existing count, and make the count only allowed to shrink — a gate that demands instant purity gets bypassed within a month, and then you've got drift *plus* ceremony; a ratchet gets obeyed (source #37). Mutation testing deserves its purpose named: it is the **deterministic hollow-test detector** — mutate the code, and a suite that stays green is hollow; it tests the tests by machine, promoting the reviewer's inferential hollow-test ban to mechanism. Run it **coverage-guided** (mutate only covered operators — uncovered code's mutants survive trivially), diff-scoped on PRs or scheduled on the calculation core (never full-suite per commit), and adopt it through the ratchet: the score only moves up (Stryker for TS, go-mutesting for Go — source #45).
 
 After minimum CI, the **autonomy trajectory** (Part 5) starts narrow and widens over the stable base — the widening criteria live in `AUTONOMY-PLAYBOOK.md`. From Part 2 onward, all content in the guideline assumes this operational base.
 
@@ -157,7 +157,7 @@ The balance: **boundary identification upfront (lightweight), tactical detail em
 
 ## Part 2 — Layer 1: Permanent knowledge
 
-**Language convention:** all agent-facing artifacts — the operational context file (`AGENTS.md`/`CLAUDE.md`, see the note in this Part), specs, `.claude/rules/`, skills — are written in English, regardless of the team's language. The models are trained predominantly on English, so English context reduces model drift and keeps terminology consistent. Discussion and planning can happen in the team's language; the versioned artifacts the agent reads are in English.
+**Language convention:** all agent-facing artifacts — the operational context file (`AGENTS.md`/`CLAUDE.md`, see the note in this Part), specs, `.claude/rules/`, skills — are written in English, regardless of the team's language. This published scaffolding uses English as its canonical artifact language for cross-harness portability; a repository may declare another canonical language. Domain terms remain verbatim and authoritative in the capability language, and any language-policy change should be evaluated against representative tasks. Discussion and planning can happen in the team's language; the versioned artifacts the agent reads are in English.
 
 Context engineering operates in three layers. Mixing them is the biggest source of problems.
 
@@ -189,6 +189,8 @@ project/
 │
 ├── .claude/
 │   ├── rules/                         ← auto-loaded every session
+│   │   ├── package-by-feature.md
+│   │   └── truth-layer.md
 │   ├── lessons.md                     ← accumulated pitfalls (skills append in Phase 6)
 │   ├── logs/                          ← structured per-run logs (auditability)
 │   ├── commands/                      ← entry points (slash commands)
@@ -197,21 +199,29 @@ project/
 │   │   ├── explain.md                 ← post-implementation walkthrough of the changes (reference + audit)
 │   │   ├── plan-from-issue.md
 │   │   ├── shape.md
+│   │   ├── to-spec.md
+│   │   ├── prep.md
+│   │   ├── orchestrate.md
 │   │   ├── spec-to-tickets.md
 │   │   └── review-spec-drift.md
+│   ├── protocols/
+│   │   ├── implementation-protocol.md ← THE shared state machine (phases 0–9, terminals)
+│   │   └── references/                ← scope manifest + review target/seal schemas
 │   ├── agents/
-│   │   └── reviewer.md                ← independent router (doesn't write; routes; reports)
+│   │   └── reviewer.md                ← fresh-context router (doesn't write; routes; reports)
 │   └── skills/
-│       ├── implement-feature/         ← local workflow (7 phases, human gates, interactive)
-│       ├── implement-backlog/         ← autonomous workflow (engine = native /goal)
+│       ├── implement-feature/         ← supervised-local adapter (protocol 0–9; in-session gates)
+│       ├── implement-orchestrated/    ← orchestrated-worker adapter (gates via GitHub)
+│       ├── implement-backlog/         ← unattended adapter (mechanical-or-abort; invoked directly)
 │       ├── plan-review/               ← review criteria: plan approach
 │       ├── general-code-review/       ← review criteria: correctness/simplicity/tests/types
 │       ├── constitution-compliance-review/   ← domain criteria: Decimal, audit, source, stages
-│       └── conformance-review/        ← domain criteria: diff vs spec + diff vs plan
+│       ├── conformance-review/        ← domain criteria: diff vs spec + diff vs plan
+│       └── ticket-readiness-review/   ← ticket as contract for a non-assisted worker
 │
 ├── .github/
 │   └── workflows/
-│       └── auto-implement.yml         ← autonomous trigger: claude -p "/goal ..." on label (skeleton)
+│       └── auto-implement.yml         ← launcher: claude -p "/implement-backlog issue #N" on label; terminal validated outside the transcript (skeleton)
 │
 ├── docs/                              ← CENTRALIZED
 │   ├── <domain-glossary>.md
@@ -314,7 +324,7 @@ Golden rules for every context file:
 - **Treat drift as a bug.** Specs and context files drift as code evolves, and there's no automatic staleness detection — version them and review the diffs **like code**. A false spec misleads more than an absent one.
 - **Don't overdose.** Half a page for a small change; the full template for a real capability.
 
-> **`AGENTS.md`/`CLAUDE.md` — the operational context file.** Throughout this guideline, "`AGENTS.md`/`CLAUDE.md`" means the operational context file that lives next to the code. The name depends on your tool: **`AGENTS.md`** is the open standard, read by Codex, Cursor, Kiro, OpenCode, Gemini CLI and others; **`CLAUDE.md`** is the name Claude Code uses. Same role, same mechanics — pick the one your tool reads. If you mix tools, keep an `AGENTS.md` and a thin root `CLAUDE.md` that does `@AGENTS.md`. Wherever this document writes one form, the other applies. The mechanics are identical across tools: the file loads by proximity (nearest-wins, lazy — only when the agent touches a file in that folder) and **points to** the capability spec rather than duplicating it. It is not the spec.
+> **`AGENTS.md`/`CLAUDE.md` — the operational context file.** Throughout this guideline, "`AGENTS.md`/`CLAUDE.md`" means the operational context file that lives next to the code. The name depends on your tool: **`AGENTS.md`** is the open standard, read by Codex, Cursor, Kiro, OpenCode, Gemini CLI and others; **`CLAUDE.md`** is the name Claude Code uses. Same role, same mechanics — pick the one your tool reads. If you mix tools, keep an `AGENTS.md` and a thin root `CLAUDE.md` that does `@AGENTS.md`. Wherever this document writes one form, the other applies. **Same role — but loader semantics differ per tool** (Claude Code loads by proximity, lazily, when the agent touches a folder; Codex builds the instruction chain once at run start, project root → CWD — folders only touched later don't auto-load; check your adapter). When the runtime doesn't guarantee loading, the workflow reads the capability's context explicitly after identifying the target. Either way the file **points to** the capability spec rather than duplicating it. It is not the spec.
 
 ### Root AGENTS.md/CLAUDE.md
 
@@ -479,7 +489,9 @@ Keep each file under 30 lines. If it grew, split it.
 
 A second rule worth shipping from day one: `.claude/rules/package-by-feature.md` (included in this system's bundle). It applies the capability-vs-entity tests at file-creation time — the **feedforward** layer of the same control the reviewer criterion covers at review time and the quarterly co-change/dependency check covers for drift. For mechanical enforcement of the checkable part, a PreToolUse hook can block creating `src/<new-folder>/` when no matching `specs/<new-folder>/` exists — enforcing package-by-feature **and** spec-before-code at once; naming quality (business verb vs data noun) can't be checked deterministically and stays with the rule and the reviewer. An example hook ships in the bundle (`.claude/hooks/require-spec-for-new-capability.sh`, opt-in — the settings snippet to wire it is in its header).
 
-**Important:** AGENTS.md/CLAUDE.md and `.claude/rules/` have ~70% adherence by the model. For guarantees that need to be 100% — like "never float on a sensitive value" in a regulated domain — promote to a **hook** (pre-commit, custom linter, AST check). A rule alone doesn't give a guarantee in code where a mistake is costly. Decimal handling is the first candidate in any system dealing with money or critical quantities.
+A third rule ships beside it: `.claude/rules/truth-layer.md` — the always-loaded guard for `specs/**`, the golden, and the ratchet baseline. Casual sessions read truth, never write it; changes go through the named flows (`/to-spec` for content, in-session human approval for criteria, the human's signature for reference values, the ratchet's own step for the baseline) — a silently edited reference table corrupts the oracle: everything downstream goes green *and lying*. The rule also carries the two floor behaviors every session owes, with or without a skill (typed branch, never the default; "done" demonstrated with runner output visible). In a dual-harness repo the content dissolves into the root `AGENTS.md`, per the coexistence table.
+
+**Important:** AGENTS.md/CLAUDE.md and `.claude/rules/` have ~70% adherence by the model (an observed operating figure, not a measured benchmark). For behaviors that need a guarantee — like "never float on a sensitive value" in a regulated domain — promote to a **deterministic check**. A hook is deterministic **within the event and matcher it intercepts**: fast feedback, not a global guarantee (other tools and paths bypass it). The authority is the CI / pre-merge gate that examines the final state regardless of how it was produced; hook + CI together give fast feedback *and* the real guarantee. A rule alone doesn't give a guarantee in code where a mistake is costly. Decimal handling is the first candidate in any system dealing with money or critical quantities.
 
 ### Skills (`.claude/skills/`)
 
@@ -531,7 +543,7 @@ There is **one spec type — the capability spec, always permanent.** The old "d
 
 **The capability spec (permanent)**
 
-Lives in `specs/<capability>/<sub-area>/<file>.md`. Created once per capability. Updated when architecture or a domain rule changes. **Creation is always human** — a capability spec is the business source of truth, and needs human domain validation. **Spec evolution** can happen during implementation (via the `implement-feature` or `implement-backlog` skills), but any spec update marks the PR as `requires_human_approval` — because a spec change is a business-rule change, and a business rule needs a human eye before merge.
+Lives in `specs/<capability>/<sub-area>/<file>.md`. Created once per capability. Updated when architecture or a domain rule changes. **Human authority, not necessarily human authorship** — agents may research, draft, and materialize proposals; what makes a spec the business source of truth is the human-protected ratification (the merge on the protected branch). **Spec evolution during implementation follows the writer matrix**: the **supervised** adapter may materialize an amendment after an explicit in-session human gate (semantic-amendment: affected IDs, old → proposed meaning, rationale — the PR ratifies with `requires_human_approval`); **orchestrated and unattended** adapters are proposal-only, materializing through `/to-spec` + the protected-branch PR. A spec change is a business-rule change: the human gate precedes any code guided by the new meaning — never normalize intent to match code.
 
 Method: research-driven. The source of truth is external (norms, regulation, existing systems, client documents).
 
@@ -541,11 +553,11 @@ How:
 
 1. Create the empty file at the correct path.
 2. Start a Claude Code session in Plan Mode.
-3. Use the `/shape` slash command or a direct prompt:
+3. Use the `/shape` slash command (then `/to-spec` writes the file) or a direct prompt:
 
 ```
 I'm going to create a spec for [capability]. Use the template in
-specs/_template/capability-spec.md.
+spec-templates/capability-spec.md.
 
 Research first:
 - Read <upstream-context>/AGENTS.md/CLAUDE.md (the input we receive)
@@ -566,7 +578,7 @@ List open questions if there's ambiguity.
 
 There is no separate "feature spec." When a change is bigger than three sentences but lands in a capability that already has a spec, you do two things — neither of which is a new permanent artifact:
 
-1. **The work is carried by a larger Phase 2 plan** — the same planning the `implement-feature` skill already produces, just with more depth. The plan is disposable: it is scaffolding for the implementation, discarded when the work is done.
+1. **The work starts as a spec delta and lands as frontier slices** — `/shape` interrogates against the existing spec and `/to-spec` writes the delta (new rules and criteria issued as typed stable IDs in continuation); after the delta merges at the gate (the rule-merge below), `/spec-to-tickets` breaks the feature into tracer-bullet slices, each carried by its own normal-sized plan (protocol Phase 3) — the same planning `implement-feature` already produces. Plans remain disposable: scaffolding for each slice, discarded when it lands.
 2. **If the feature introduces a new business rule, that rule is merged into the capability spec** — because a rule is a source of truth, and source of truth lives in the permanent spec (with `requires_human_approval`, since it's a business-rule change). If merging it would make the capability spec too big to maintain, that is the signal to split the capability by boundary — the normal decomposition mechanism, not a new spec type.
 
 So the durable record of a large feature lives in three places, each with its role: the **rule** goes into the capability spec, the **plan** is discarded, and the **understanding of what was done and why** goes into the `/explain` walkthrough (`docs/walkthroughs/`). None of these is a "feature spec."
@@ -579,24 +591,30 @@ Saved in `.claude/commands/`. Versioned in the repo.
 
 **`/plan-from-issue.md`** — generates a phased implementation plan from a GitHub issue (reads the issue, the capability's context file and spec, enters Plan Mode; no implementation). Ships in the bundle.
 
-**`/shape.md`** — the work-shaping interview, one question at a time with a recommended answer every time, the codebase consulted before the human. Creates a capability spec from an idea, a transcript, or existing code; refines an existing spec (grill-back: divergence probe, boundary probe, oracle coverage); or sharpens a task until an agent could implement it without guessing. Ships in the bundle.
+**`/shape.md`** — the work-shaping interview, working the question frontier in rounds — every currently-askable question at once, each with a recommended answer — the codebase consulted before the human. Interrogates an idea, a transcript, existing code, or an existing spec (grill-back: divergence probe, boundary probe, oracle coverage), or sharpens a task — the interview only; `/to-spec` writes the file. Ships in the bundle.
 
-**`/spec-to-tickets.md`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's numbered criteria, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
+**`/to-spec.md`** — writes or updates the capability spec from the interview: fills the template from a `/shape` session (or provided notes), never interviews back — gaps become open questions; new items issued as typed stable IDs in continuation, existing IDs never touched. Ships in the bundle.
+
+**`/prep.md`** — one-time repository preparation: the three-command verification interface (`check` / `check-<capability>` / `golden`), the metric-class gates (stack-agnostic: the class is the requirement, the tool an instance; absence = named blocker), the golden harness skeleton reading `specs/<cap>/tables/`, minimum CI as visible checks, and the ratchet baseline (grandfather the count; it only shrinks). Brownfield-safe, proven by running. Ships in the bundle.
+
+**`/orchestrate.md`** — full-project orchestration in **resolution-gated waves** (the gkpacker field pattern, source #48, adapted): wave table from the explicit `Blocked by` graph; one worker per ticket in child worktrees cut from fresh, verified `origin/main`; persistent monitor with CI and review **fingerprints** (new feedback revokes review-ready — CI green is not the whole gate); reviewer-triage taxonomy for humans, bots, and agents; applicable-lens review on every PR; human merges gate each wave. Orca mechanism loaded at runtime (`ORCA skills get orchestration --full`); baked-in defaults never re-asked; caps, question policy, and the 2-consecutive halt built in. Ships in the bundle.
+
+**`/spec-to-tickets.md`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's pointed stable IDs, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
 
 **`/review-spec-drift.md`** — the periodic whole-capability audit: spec ↔ code ↔ contracts divergence, reported as critical / relevant / cosmetic drift. Complements `conformance-review`, which is diff-scoped. Ships in the bundle.
 
-**`/implement.md`** — local entry point: runs the `implement-feature` skill with its human gates; interactive only (supervised `/goal` recommended — recipes below; headless never). Ships in the bundle.
+**`/implement.md`** — discoverability redirect only: it points you at the direct invocation (`/implement-feature …`) — the transactional skills are user-invocation-only, so no command body can load them for you. Ships in the bundle.
 
-The two entry points, by mode: the **local** mode uses `/implement` above and runs interactively — you confirm each gate. The **autonomous** mode uses Claude Code's **native `/goal` in headless mode** as its engine (see `implement-backlog` below), not a custom command. The line that separates them is not `/goal` itself but **interactive vs headless**: interactively, a gate question pauses the turn, you answer, and the answer enters the transcript — gates and loop coexist (verified in practice); headless, there is no one to answer, so gates are replaced by named-blocker aborts.
+Three entry points, by mode — **each invoked directly by its user or launcher** (the transactional skills are user-invocation-only; a wrapper or a `/goal` condition that merely *names* a skill does not load it): **local** = `/implement-feature …` typed by you, interactively; **orchestrated** = `/implement-orchestrated issue #N --mode …` as the worker's first message; **unattended** = `/implement-backlog …` invoked directly by the launcher. The line that separates them is not `/goal` itself but **interactive vs headless**: interactively, a gate question pauses the turn, you answer, and the answer enters the transcript — gates and loop coexist (verified in practice); headless, there is no one to answer, so gates are replaced by named-blocker aborts.
 
-### Supervised `/goal` — the recommended local invocation
+### Optional: `/goal` as a composition — experimental, eval-gated
 
-For any feature with acceptance criteria, wrap the local skill in `/goal`: the human gates stay (questions pause the turn) *and* the worker cannot declare completion — a fresh evaluator re-checks the condition each turn and forces another until it holds. The condition is everything: the evaluator reads only the transcript, so **write it to demand evidence, not claims**. Task-based:
+The recommended local path is the **direct invocation** of the adapter (`/implement-feature …`). `/goal` is a session-scoped Stop hook whose evaluator reads only the transcript: it can add a completion re-check on top of a run, but **it is not the engine and it never loads a skill** — setting a goal starts a turn of its own, so the composition (goal set, then adapter invoked) is unproven until an eval covers it. Treat the recipes below as an experiment, not doctrine. The condition is everything: **write it to demand evidence, not claims**. Task-based:
 
 ```text
-/goal Implement task #<N> with the implement-feature skill.
+/implement-feature task #<N>   # direct invocation; wrap in a supervised /goal only as a separately verified composition — naming the skill inside a goal condition does not load it
 Done when ALL of the following hold:
-- every phase of implement-feature ran, and the Phase 2 plan was
+- every phase of implement-feature ran, and the plan (protocol Phase 3) was
   explicitly approved by the user in this session;
 - every acceptance criterion of task #<N> is verified by a passing
   test, with the runner's real output visible in this session — not
@@ -612,13 +630,13 @@ Done when ALL of the following hold:
 Spec-based (a new capability — remember: the spec is the source of truth, the run/issue is the execution unit; slice a large capability into issues that *point at* the spec's criteria instead of copying them, and make the first slice the walking skeleton when the capability has contracts with others):
 
 ```text
-/goal Implement the <capability> capability from
-specs/<capability>/<capability>.md using the implement-feature skill.
+/implement-feature <capability> — implement the capability from
+specs/<capability>/<capability>.md — invoke `/implement-feature <spec slice>` directly (a `/goal` condition that names a user-only skill does not load it).
 Done when ALL of the following hold:
-- every phase ran, and the Phase 2 plan was explicitly approved by
+- every phase ran, and the plan (protocol Phase 3) was explicitly approved by
   the user in this session;
 - every criterion in the spec's "Acceptance criteria" section [or
-  the slice: items 1-4] is verified by a passing test with the
+  the slice: its pointed IDs] is verified by its declared method with the
   runner's real output in this session — not by claim;
 - every row of the spec's reference-value table is covered by a test
   asserting input → expected output;
@@ -632,65 +650,88 @@ Done when ALL of the following hold:
 - hard cap: 40 turns.
 ```
 
-Two operational notes. A "no" at a gate **redirects** the worker; it does not end the run — the condition stays unmet and the evaluator forces another turn; the real stop button is the interrupt, outside the loop's semantics. And plain `/implement` (no `/goal`) remains right for small increments, where the loop's overhead exceeds what it protects.
+Two operational notes. A "no" at a gate **redirects** the worker; it does not end the run — the condition stays unmet and the evaluator forces another turn; the real stop button is the interrupt, outside the loop's semantics. And a plain direct invocation (`/implement-feature`, no `/goal` wrapper) remains right for small increments, where the composition's overhead exceeds what it protects.
 
 ### Implementation skills
 
-Two skills materialize the implementation workflow as an executable folder in `.claude/skills/`. They're a natural evolution of the slash commands above: instead of generating a plan or comment, they run the Plan → Implement → QA → Close the loop cycle end to end.
+The mode adapters materialize the implementation workflow as an executable folder in `.claude/skills/`. They're a natural evolution of the slash commands above: instead of generating a plan or comment, they run the Plan → Implement → QA → Close the loop cycle end to end.
 
 **`implement-feature`** — local skill, human-driven.
 
 For interactive use in local Claude Code. Covers three scenarios, all starting from an **existing** spec or backlog item (spec creation/refinement is out of scope):
 
 1. Implementing a new capability — starting from the human-led spec
-2. Implementing a large feature in an existing capability — from a larger Phase 2 plan, merging any new rule into the capability spec
+2. Implementing a large feature in an existing capability — from a spec delta merged at the gate, then `/spec-to-tickets` slices worked from the frontier, each with its own normal-sized plan (protocol Phase 3)
 3. Increment — starting from an issue or direct prompt
 
-Seven-phase flow, with a human confirmation gate after Phase 1, 1.5, and 2:
+The canonical machine is the shared protocol
+(`.claude/protocols/implementation-protocol.md`, **phases 0–9** —
+preflight, proven delta, understand, plan, implement, verify, durable
+sync, seal, review, deliver). The bullets below are the
+**supervised-local adapter's pass** through it (protocol phase in
+parentheses); the human satisfies every gate in-session. Before the
+first bullet, the protocol runs Phase 0 (authority + pinned-commit
+preflight) and Phase 1 (proven delta — a no-gap finding is a
+`NO_CHANGE_CANDIDATE`, and only the Phase 8 evidence-target review
+turns it into the `NO_CHANGE_REQUIRED` terminal). The bullets below
+are listed in protocol order: durable sync (Phase 6) finishes BEFORE
+the seal (Phase 7), and the review (Phase 8) judges the sealed
+candidate — any fix returns to Phase 4, re-verifies, re-syncs if
+needed, and re-seals before a new review:
 
-- **Phase 1: Understand** — reads the instruction, input (spec/issue), root AGENTS.md/CLAUDE.md → capability AGENTS.md/CLAUDE.md → pointed spec, `.claude/rules/`, `lessons.md`. Maps affected code.
-- **Phase 1.5: Resolve ambiguities** — surfaces ambiguities via AskUserQuestion. Does not proceed with unresolved ambiguity.
-- **Phase 2: Plan** — ULTRATHINK in plan mode (read-only). Lists files it will edit (committed scope), and separates load-bearing decisions (which determine whether the approach works or which architecture is committed — pinned now) from deferred details (reversible, left to implementation).
-- **Phase 3: Implement** — executes the plan on a typed work branch (`feature/`, `fix/`, `refactor/`, `chore/`). Runs lint + typecheck + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
-- **Phase 4: Test** — full local suite. Doesn't proceed until green.
-- **Phase 5: Code Review** — dispatches the `reviewer` agent (the router, see below) via the Agent tool (renamed from Task; the alias still works) in isolated context; it routes to the applicable review-criteria skills. Sequential with Phase 4 — any fix forces a return to Phase 4.
-- **Phase 6: Close the loop** — appends to lessons, possible spec update (with the `requires_human_approval` flag), AGENTS.md/CLAUDE.md proposal (propose-only, doesn't edit directly), backlog status.
-- **Phase 7: Open PR & Present Results** — pushes the typed work branch, opens a PR (description on the shared template, Approved plan included), and reports in chat: link, scope, decisions needing attention, human-approval flag.
+- **Understand (protocol Phase 2)** — reads the instruction, input (spec/issue), root AGENTS.md/CLAUDE.md → capability AGENTS.md/CLAUDE.md → pointed spec, `.claude/rules/`, `lessons.md`. Maps affected code.
+- **Resolve ambiguities (protocol Phase 2, gate)** — surfaces ambiguities via AskUserQuestion. Does not proceed with unresolved ambiguity.
+- **Plan (protocol Phase 3; APPROVAL-FINGERPRINT logged)** — ULTRATHINK in plan mode (read-only). Lists files it will edit (committed scope), and separates load-bearing decisions (which determine whether the approach works or which architecture is committed — pinned now) from deferred details (reversible, left to implementation).
+- **Implement (protocol Phase 4)** — executes the plan on a typed work branch (`feature/`, `fix/`, `refactor/`, `chore/`). Runs lint + typecheck + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
+- **Verify (protocol Phase 5)** — full local suite. Doesn't proceed until green.
+- **Durable sync (protocol Phase 6) → Seal (Phase 7)** — see the next bullet for what durable sync writes; the seal then freezes base/head and the full suite runs on the final tree.
+- **Review (protocol Phase 8)** — dispatches the `reviewer` agent (the router, see below) via the Agent tool (renamed from Task; the alias still works) in isolated context against the **sealed candidate**; it routes to the applicable review-criteria skills. Any fix returns to Phase 4 and re-seals — no PR ships a changeset the review did not see.
+- **What durable sync writes (protocol Phase 6)** — appends to lessons, a spec amendment **only under the supervised writer matrix** (in-session gate + `requires_human_approval` on the PR; other modes are proposal-only), AGENTS.md/CLAUDE.md proposal (propose-only, doesn't edit directly), backlog status. `lessons.md` carries a line budget (~150 lines): when full, curating means replacing, not appending — an unbounded lessons file becomes a megafile no agent reads. The entry bar is the **surprise encounter**: what made *this* trajectory longer than the next one needs to be (source #42; curation stays human — propose-only holds). The form test is Garg's heuristic (source #49): would a reasonably competent agent make the right decision **once it knew the one missing fact**? If yes, the lesson states the fact; a lesson that specifies a decision procedure (approvals, checkpoints, rituals) is bureaucracy where a clarification would have done.
+- **Delivery (protocol Phase 9)** — pushes the typed branch, opens a PR (shared template, Approved plan + fingerprint included), reports in chat, and ends at `PR_READY_AWAITING_HUMAN`.
 
-Structured logging in `.claude/logs/implement-{timestamp}.md` for auditability.
+Structured logging in `.claude/logs/implement-{timestamp}.md` for auditability. The logs are also the metrics source: **rework rate** (Replans + review-fix iterations per merged PR), **cycle time** (label-to-merge), and — once `EVALS.md` exists — eval scores per run; the raw fields already ship in the log templates (source #31).
 
 **`implement-backlog`** — autonomous skill, agent-driven.
 
-For end-to-end execution **with no human in the loop**. The persistence engine is Claude Code's native `/goal` command (a session-scoped Stop hook: after each turn a fresh model re-checks a completion condition and forces another turn until it holds). A thin GitHub Action runs `claude -p "/goal <condition>"` in headless mode when an issue gets an `auto-implement` label; the condition names this skill as the workflow and mirrors its completion criteria and aborts. There is no custom orchestrator service — the Action is the trigger, the native `/goal` is the engine, the skill is the workflow, and the `reviewer` carries the criteria. A scheduled Claude Code Routine is the sibling wiring — same engine, same condition shape; its canonical prompt ships in the bundle (`.claude/routines/frontier-worker.md`): scan the frontier, claim one issue, issue the `/goal`.
+For end-to-end execution **with no human in the loop**. The launcher is **external and explicit** — a thin GitHub Action invokes the skill **directly** — `claude -p "/implement-backlog issue #<N>"` — when an issue gets an `auto-implement` label, and validates the terminal state **outside the transcript** (the DONE contract below is the launcher's checklist, not a goal condition: naming a user-only skill inside `/goal` does not load it). There is no custom orchestrator service — the Action is the launcher, the skill is the workflow, the `reviewer` carries the criteria. A scheduled Routine is the sibling wiring; its canonical prompt ships in the bundle (`.claude/routines/frontier-worker.md`): scan the frontier, claim one issue, invoke the skill directly.
 
-One property of headless runs governs the whole design: **a question to the user never gates a headless `/goal` run** — there is no one to answer, and the evaluator reads only the transcript, so an interactive gate would be silently overrun rather than block. That is why this skill never asks: every would-be question is a **named-blocker abort** (the only human stop the evaluator can read), and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after it.
+One property of headless runs governs the whole design: **a question to the user never gates a headless run** — there is no one to answer, and the evaluator reads only the transcript, so an interactive gate would be silently overrun rather than block. That is why this skill never asks: every would-be question is a **named-blocker abort** (the only human stop the evaluator can read), and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after it.
 
 Scope restricted to increment. Issues describing a new capability or a large feature are routed back to `implement-feature` with a comment and label.
 
 Same phase structure as `implement-feature`, with critical differences:
 
 - No human confirmations between phases. Decisions go to the log and the PR description; human review happens at the PR.
-- **Phase 2 (plan review)** — since no human reviews the plan, a `reviewer` subagent does: it applies `plan-review` to judge the approach against failure modes, fit, and pinned load-bearing decisions, iterating until sound before any code. This is the gate that replaces implement-feature's human approval of the plan.
-- **Phase 1.5 (ambiguity)** — comments on the issue (numbered list + proposed interpretations), applies a `needs-refinement` label, aborts. Doesn't try to resolve autonomously. Aborting early is cheaper than producing a PR based on a wrong interpretation.
+- **Plan review (protocol Phase 3)** — since no human reviews the plan, a `reviewer` subagent does: it applies `plan-review` to judge the approach against failure modes, fit, and pinned load-bearing decisions, iterating until sound before any code. This is the gate that replaces implement-feature's human approval of the plan.
+- **Ambiguity (protocol Phase 2)** — comments on the issue (numbered list + proposed interpretations), applies a `needs-refinement` label, aborts. Doesn't try to resolve autonomously. Aborting early is cheaper than producing a PR based on a wrong interpretation.
 - **Phase 3 (scope expansion)** — comments on the issue, applies a `scope-expansion-needed` label, aborts. Doesn't silently expand.
-- **Phase 4/5 (QA)** — cap of 3 iterations on the same failure. On hitting it, comments on the issue (`qa-blocked` or `review-blocked`) and aborts.
-- **Phase 6 (spec update)** — if an update is needed, it updates AND marks the PR as `requires_human_approval` (label + field in the description).
-- **Phase 7** — opens a PR (not a report), comments on the issue with the link, then monitors the PR until it lands clean: CI to completion (a green check can flip red), late review comments, and merge conflicts (resolving one re-runs the QA gates). Opening the PR is not "done"; merged-clean or a named blocker is.
+- **Verification (protocol Phase 5)** — cap of 3 iterations on the same failure. On hitting it, comments on the issue (`qa-blocked` or `review-blocked`) and aborts.
+- **Spec conflict** — `SPEC_CHANGE_REQUIRED`: amendment proposal on the issue; the run blocks. This adapter never edits semantics.
+- **Delivery (protocol Phase 9)** — opens a PR, comments on the issue with the link, and ends at `PR_READY_AWAITING_HUMAN`. A separate monitor observes CI flips, late feedback, and the merge — the run never claims "landed".
 
 Prerequisite to turn on in production: the narrow-start conditions of Part 5 — a hard-coded allowlist of trivial increment classes, CI green mandatory before review, and a human approving every PR. **Widening** (more classes, more volume, any step toward auto-merge) additionally requires the regression suite with a track record (`AUTONOMY-PLAYBOOK.md`, `EVALS.md`); widening without it is faith.
 
-**The autonomous trigger, concretely.** The native `/goal` condition is what the Action invokes. It names the skill, mirrors its completion criteria and aborts, and carries a "done with a named blocker" clause so a legitimate abort ends the goal instead of looping:
+**The launch contract, concretely.** The Action's `prompt` IS the
+direct invocation (`/implement-backlog issue #<N>`); the launcher
+validates the structured terminal **outside the transcript**. `/goal`
+is an optional, runtime-specific composition — eval-gated, never the
+engine, never a loader. DONE when ONE holds:
 
 ```text
-/goal Implement GitHub issue #<N> by following the implement-backlog skill end to end.
-DONE only when all hold and are visible in the conversation: every acceptance criterion verified by a passing test (runner output visible, not claimed); full suite green with tests anchored on the spec's acceptance criteria; lint passes and coverage meets the threshold; the reviewer ran on the final diff with no [BLOCKER] (incl. constitution-compliance and conformance where they apply); a PR is open with CI green to completion.
-OR DONE WITH A NAMED BLOCKER when the skill aborts, commented on the issue, and applied the label: out of scope → implement-feature; ambiguity → needs-refinement; scope expansion → scope-expansion-needed; same QA/review failure 3+ times → qa-blocked / review-blocked.
-Constraints: stay in the capability; never expand scope silently; if the spec is updated, mark the PR requires_human_approval; never mark done around a red check. Stop at one of the two end states or after 40 turns.
+A. PR_READY_AWAITING_HUMAN — PR open on the shared template, every
+   pointed criterion evidence-verified. CI flips, late feedback and
+   the merge belong to the external monitor, never to the run.
+B. NAMED_BLOCKER — specific blocker commented, label applied, claim
+   released.
+C. NO_CHANGE_CANDIDATE → corroborated NO_CHANGE_REQUIRED — evidence
+   target posted, fresh-context review corroborated, claim released,
+   no PR by design.
 ```
 
 A thin GitHub Action invokes it headlessly on the label. The skeleton below is conceptual — confirm the real Claude Code CI setup (install, auth, `gh` permissions, the official Claude Code GitHub Action vs raw `claude -p`) against the headless and GitHub Action docs before relying on it:
 
 ```yaml
+name: frontier-worker
 on:
   issues:
     types: [labeled]
@@ -700,18 +741,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: claude -p "/goal Implement GitHub issue #${{ github.event.issue.number }} ... (full condition above)"
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: anthropics/claude-code-action@v1
+        with:
+          prompt: "/implement-backlog issue #${{ github.event.issue.number }}"
+          claude_args: "--max-turns 60"
+      # the launcher then validates the structured terminal
+      # (result artifact) outside the transcript — never a /goal
+      # condition naming the skill
 ```
 
-**Why two skills, not one with a flag**
+**Why mode adapters over one flagged skill** (historical note: the method began as two monolithic skills; the shared protocol + three thin adapters replaced them)
 
-Interactive mode and autonomous mode have fundamentally different gates (human confirms vs PR is the gate). Trying a bimodal skill with a flag adds branching that increases bug surface and makes isolated auditing of each mode harder. The content duplication between the two is accepted in exchange for each being auditable in isolation. If real pain appears ("I updated one, forgot the other"), it's worth extracting a common reference document in `.claude/docs/` that both read — don't do it before the pain appears.
+The modes have fundamentally different gate providers (human in-session vs GitHub-mediated vs mechanical-or-abort), which is exactly why they are **thin adapters over one extracted machine** — the pain appeared, the extraction happened: `.claude/protocols/implementation-protocol.md` is the shared state machine, and each adapter declares only who satisfies each gate. Duplication between modes is now a validator violation, not an accepted trade.
 
 ### The reviewer agent and review-criteria skills
 
-Code review (Phase 5) and the autonomous plan gate (implement-backlog Phase 2) are not inlined in the implementation skills — they dispatch a separate **`reviewer` agent** that runs in isolated context and did **not** write the work under review. That independence is the point: a fresh context doesn't share the author's blind spots. The reviewer reports findings (`[BLOCKER]`/`[SHOULD]`/`[NIT]`); it never edits.
+Code review (protocol Phase 8) and the plan gate (protocol Phase 3) are not inlined in the implementation skills — they dispatch a separate **`reviewer` agent** that runs in isolated context and did **not** write the work under review. That context separation is the point — decorrelation, not independent proof: a fresh context doesn't share the author's blind spots. The reviewer reports findings (`[BLOCKER]`/`[SHOULD]`/`[NIT]`); it never edits.
 
 The reviewer is a **router**: it carries no criteria of its own. The criteria live in modular review-criteria skills, and the reviewer loads the ones that fit what it's handed:
 
@@ -729,7 +774,7 @@ The implementation skills only say "dispatch the `reviewer` with this plan/diff"
 A lens (from ThoughtWorks) for auditing the controls above: every control is either **feedforward** (a guide applied *before* the agent acts) or **feedback** (a sensor applied *after*), and either **computational** (deterministic, runs in milliseconds) or **inferential** (an LLM, runs in seconds, catches what code analysis can't). The four quadrants, with this system's controls in each:
 
 - **Feedforward · computational** (deterministic guides): the type system (Decimal not float), ADRs, `.claude/rules/` with `paths:`.
-- **Feedforward · inferential** (LLM/prose guides): the specs, the constitution, the AGENTS.md/CLAUDE.md files, the approved Phase 2 plan.
+- **Feedforward · inferential** (LLM/prose guides): the specs, the constitution, the AGENTS.md/CLAUDE.md files, the approved plan (protocol Phase 3).
 - **Feedback · computational** (deterministic sensors): tests, lint, coverage, mutation testing, golden datasets, contract tests, CI.
 - **Feedback · inferential** (LLM sensors): the reviewer (general + constitution-compliance + conformance) and any external advisory reviewer.
 
@@ -800,10 +845,10 @@ Starting a feature:
 3. Open Claude Code in the affected capability's directory.
 4. Decide: simple change, large feature, or new capability?
    - **Simple:** straight to Plan Mode with the issue as context.
-   - **Large feature in an existing capability:** a larger Phase 2 plan carries it; if it introduces a new business rule, merge the rule into the capability spec first (human approval).
-   - **New capability:** run `/shape` to create its spec, `/spec-to-tickets` to break it into issues, then implement from the frontier.
+   - **Large feature in an existing capability:** `/shape` interrogates against the existing spec and `/to-spec` writes the delta; merge it at the gate first (human approval — the rules land in the capability spec), then `/spec-to-tickets` and implement from the frontier.
+   - **New capability:** run `/shape` → `/to-spec` to create its spec, `/spec-to-tickets` to break it into issues, then implement from the frontier.
 
-   For the last two cases — anything with acceptance criteria — the recommended invocation is the **supervised `/goal`** from Part 3: the evaluator holds the run to evidence while your gates still fire. Plain Plan Mode / `/implement` remains right for the simple case.
+   For the last two cases — anything with acceptance criteria — invoke the adapter directly (`/implement-feature …`): the protocol's own gates hold the run to evidence. A `/goal` wrapper is an optional, eval-gated composition (Part 3), never the loader. Plain Plan Mode remains right for the simple case.
 5. Named branch: `<stage>/<sub-area>/<issue-number>-<short-slug>`. E.g.: `<stage>/<sub-area>/142-<short-description>`.
 
 Plan Mode → Execution:
@@ -861,7 +906,7 @@ Autonomy over the stabilized operational base (minimum CI, see Part 1) is a **gr
 
 Before anything autonomous, an essential split. It defines what kind of work is happening, and consequently who drives (human vs agent) and how it enters the system.
 
-**Architecture work.** Creating a new capability, a new sub-area, a large feature that reorganizes the pipeline. Always human-led: you plan how the system should be (create the spec), execute via `implement-feature` (local skill, with human gates at each phase), open a PR. The spec is the business source of truth — creation is always human because it's a domain decision that needs validation from whoever understands the rule. **It doesn't go through the backlog. It doesn't enter the autonomy trajectory.** Spec evolution during execution can happen via the skill itself, but it triggers a human approval flag on the PR.
+**Architecture work.** Creating a new capability, a new sub-area, a large feature that reorganizes the pipeline. Always human-led: you plan how the system should be (create the spec), execute via `implement-feature` (local skill, with human gates at each phase), open a PR. The spec is the business source of truth — **human authority, not necessarily human authorship**: agents may research and draft; the human-protected ratification is what makes it truth. **It doesn't go through the backlog. It doesn't enter the autonomy trajectory.** Spec evolution during execution follows the writer matrix (supervised: gated materialization; other modes: proposal-only).
 
 **Increment work.** Everything else: bugfix, tech-debt, a feature within an existing capability, an isolated rule adjustment with a normative source already cited (when applicable), a reference-table update. It enters through the backlog (GitHub Issues), goes through weekly triage, and is the only kind of work autonomy touches.
 
@@ -897,7 +942,7 @@ AGENTS.md/CLAUDE.md:
 - ❌ Put detailed code-style rules. Use a linter/formatter.
 - ❌ Root AGENTS.md/CLAUDE.md over 100 lines.
 - ❌ Repeat information between the root AGENTS.md/CLAUDE.md and the capability ones. Use references.
-- ❌ Use it for security- or correctness-critical things. AGENTS.md/CLAUDE.md has ~70% adherence; hooks have 100%.
+- ❌ Use it for security- or correctness-critical things. AGENTS.md/CLAUDE.md has ~70% adherence; hooks are deterministic within their matcher, and the CI state check closes the rest.
 
 Specs:
 
@@ -970,7 +1015,7 @@ Done when you can explain to another person what each capability does and doesn'
 
 ### Stage 1 — Specification — Week 1
 
-- [ ] Create `specs/_template/capability-spec.md`
+- [ ] Create `spec-templates/capability-spec.md`
 - [ ] Write a capability spec for the first capabilities to implement
 - [ ] Cite the normative source in each rule that derives from an external source
 

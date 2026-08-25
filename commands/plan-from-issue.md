@@ -1,6 +1,6 @@
 ---
 description: Generates an implementation plan from a GitHub issue
-argument-hint: [issue number]
+argument-hint: "[issue number]"
 ---
 
 Take the issue number from the argument. Do:
@@ -17,4 +17,7 @@ Don't implement. Just plan.
 
 This plan informs triage and issue refinement. Implementation re-plans
 inside `implement-feature` / `implement-backlog`, with its own gate — do
-not treat this output as the approved Phase 2 plan.
+not treat this output as the approved plan (protocol Phase 3).
+
+Portability: this command's body works as a standalone prompt in any
+harness — the semantic procedure is portable; invocation, permissions, and context loading need the harness adapter.

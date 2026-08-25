@@ -1,6 +1,6 @@
 ---
 description: After implementing, generate a complete reference walkthrough of the changes made — every dimension (what, how, why), anchored in the spec, plan, and diff — as a self-contained interactive HTML page in docs/walkthroughs/
-argument-hint: [default: this session's work | diff | branch | PR]
+argument-hint: "[default: this session's work | diff | branch | PR]"
 ---
 
 Generate a complete reference walkthrough of the changes in the argument — the
@@ -13,7 +13,7 @@ exactly what was built and why, with nothing material left out.
 Do not walk the diff blind. Read, and use as the backbone of the explanation:
 
 - The **diff** of all changes (the what).
-- The **capability spec** and the **approved Phase 2 plan** (the intent —
+- The **capability spec** and the **approved plan (protocol Phase 3)** (the intent —
   what was asked and which approach was committed).
 - The **decisions** captured in Phases 1.5 and 2, including the tradeoffs (the
   *why*, which the code does not contain).
@@ -25,7 +25,7 @@ the change *against what it was supposed to do*, not in a vacuum.
 
 When the target is work from another session (a diff, branch, or PR), the
 intent artifacts aren't in this conversation: pull the plan from the **PR
-description** (implement-backlog puts it there) or the **run log** under
+description** (both implement skills put it there) or the **run log** under
 `.claude/logs/`. If an intent artifact is genuinely unavailable, say which
 dimensions lack it — do not reconstruct intent from the code and present it
 as the plan.
@@ -37,7 +37,15 @@ and how it connects*, not line by line. If a paragraph could be replaced by
 reading the code, cut it; spend the words on what the code does not say (the
 reason, the constraint, the cross-file flow, the edge case). "Exhaustive" means
 no dimension missing, not every line narrated. There is no length limit — let
-completeness set the length.
+completeness set the length. And when behavior resists prose — a scheduler, a
+state machine, a data flow you can only *feel* by stepping through it — offer a
+**throwaway comprehension tool** alongside the document (a custom debugger, a
+step-through UI, a time-scrubber): agents can write code that helps humans
+understand code; keep the understanding, delete the tool. And for
+behaviors with state or permissions, cover the behavior-unit
+checklist: **trigger → rule → state change → execution path (including
+failure) → edge cases**, each step with its evidence link — prose
+explains; facts anchor.
 
 ## Structure of the document
 
@@ -87,7 +95,7 @@ so explicitly rather than skipping silently):
 13. **Decisions and why** — the load-bearing decisions, each with the option
     chosen, what was considered, and the tradeoff. This is the highest-value
     section: it is the reasoning that the diff threw away. Pull it from the
-    Phase 1.5/2 record.
+    ambiguity-gate (protocol Phase 2) record.
 14. **Watch-outs** — debt knowingly taken, low-confidence decisions with their
     review trigger, and anything to watch as the system evolves.
 15. **Quiz (do not skip)** — 5-8 multiple-choice questions of medium difficulty:
@@ -112,7 +120,11 @@ dependencies, so it opens anywhere from the repo clone.
   throughout** (e.g., one system-map style, one flow style, one data-shape
   style), always populated with **example data**, drawn as styled HTML/SVG —
   never ASCII art.
-- **Quiz:** real toggles (click an option → reveal ✅/❌ with the explanation).
+- **Quiz:** real toggles (click an option → reveal ✅/❌ with the
+  explanation). The quiz is a **speed regulator**: the loop easily runs
+  faster than the speed of human understanding, and the quiz is the
+  counterbalancing force (Litt). The reader's rule worth adopting on
+  the other side: don't approve or forward what you can't quiz-pass.
 - **Self-check before finishing:** if any container uses
   `white-space: pre-wrap`, verify the generated source has no stray
   indentation rendering as accidental formatting — regenerate if it does.
@@ -123,3 +135,6 @@ reference and, in a regulated domain, an audit artifact mapping code to spec —
 keep it in the repo, not in chat. Note the chosen trade-off: GitHub's web UI
 shows `.html` as source, so this artifact is read locally in a browser — the
 reading experience is the point.
+
+Portability: this command's body works as a standalone prompt in any
+harness — the semantic procedure is portable; invocation, permissions, and context loading need the harness adapter.
