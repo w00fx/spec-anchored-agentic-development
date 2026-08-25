@@ -12,7 +12,9 @@ description: >-
 # implement-feature — supervised-local adapter
 
 **Phase 0 first action: read `.claude/protocols/implementation-protocol.md`
-NOW.** It is the state machine — phases, terminals, invariants,
+NOW.** (Installed at user level, the same file sits under your `~/.claude`;
+the Codex port reads it from `agent-system/protocols/`. If none of the three
+resolves, that is a NAMED_BLOCKER — never run the machine from memory.) It is the state machine — phases, terminals, invariants,
 logging, rationalizations. This file only configures who satisfies
 each gate. Treat the protocol as mandatory, not as an optional
 reference.
