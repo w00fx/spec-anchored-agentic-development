@@ -1,38 +1,46 @@
 ---
-description: Shape work through a relentless interview — create a capability spec from an idea, transcript, or existing code; refine an existing spec; or sharpen a task until it's implementable. One question at a time with a recommended answer, the codebase consulted before the human, and the paper trail written the moment things resolve.
-argument-hint: [idea | task/issue | spec path | transcript | code area]
+description: Shape work through a relentless interview — interrogate an idea, a transcript, existing code, or an existing spec until shared understanding; or sharpen a task until it's implementable. Works the question frontier in rounds — every currently-askable question at once, numbered, each with a recommended answer — the codebase consulted before the human. The interview only — /to-spec writes the file.
+argument-hint: "[idea | task/issue | spec path | transcript | code area]"
 ---
 
 Identify the target from the argument and pick the mode:
 
-- **An idea or ongoing discussion** → create a capability spec.
+- **An idea or ongoing discussion** → interview toward a capability
+  spec (`/to-spec` writes it).
 - **A transcript** (meeting, chat, voice note) → extract what was
-  decided, interrogate the gaps, create the spec.
+  decided, interrogate the gaps.
 - **Existing code with no spec** (brownfield) → archaeology: read the
-  code, draft what it *does*, interrogate what it *should* do.
+  code, establish what it *does*, interrogate what it *should* do.
 - **An existing spec** → grill-back: interrogate the document for
-  ambiguity and holes, refine it.
+  ambiguity and holes (`/to-spec` applies the refinements).
 - **A task / issue** → sharpen it until an agent could implement it
   without guessing.
 
-All modes are one machine: interview relentlessly **until we reach a
-shared understanding** — that is the termination condition, not a
-checklist filled. Never write implementation code.
+All modes are one machine: interview relentlessly **until the
+frontier is empty and we reach a shared understanding** — every branch
+of the design tree visited, nothing left silently assumed; that is the
+termination condition, not a checklist filled. Never write implementation code — and never write or
+edit the spec file: that is `/to-spec`'s job.
 
 ## Interview mechanics
 
-- **One question at a time, then wait for feedback before continuing.**
-  Asking multiple questions at once is bewildering. Walk down each
-  branch of the design tree, resolving dependencies between decisions
-  one by one — the answer to question 3 changes what question 7 should
-  be. Exception: **task mode** may ask small thematic batches (3-5
-  related questions); tasks have shallow decision trees and the human
-  answers between meetings.
+- **Map the interview as a design tree and work it in rounds.** Every
+  decision branches into the decisions that hang off it. The
+  **frontier** is every question whose prerequisites are already
+  settled — askable *now* without guessing at answers you haven't
+  heard. Ask the whole frontier in one round, numbered; then wait. A
+  question whose answer depends on another question still open in
+  this round belongs to a *later* round. Each round of answers
+  reshapes the tree — settled decisions push the frontier outward;
+  recompute and ask the next round.
 - **For each question, provide your recommended answer.** The human
   confirms or corrects; composing from scratch is friction. The
   recommendation is a proposal — the human's answer is the truth.
 - **If a question can be answered by exploring the codebase, explore
-  the codebase instead.** One law bounds this (our addition, for
+  the codebase instead** — dispatch the exploration and don't block
+  the frontier on it: a running exploration is an unsettled
+  prerequisite, so only the questions downstream of it wait; ask the
+  rest of the round now. One law bounds this (our addition, for
   domains where truth is external): code settles **facts** ("the
   parser already returns a validated Decimal"); code does not settle
   **intent** — behavior found in code enters as a *question*, never as
@@ -74,7 +82,7 @@ while you go:
 
 The question generator is not vibes — it is the spec template plus the
 ambiguity classes the implement skills abort on. This interview is
-Phase 1.5 run *before* the work instead of during it:
+the ambiguity gate (protocol Phase 2) run *before* the work instead of during it:
 
 - **Purpose and capability language** — what this does for the
   business; the terms with specific meaning inside it.
@@ -93,9 +101,15 @@ Phase 1.5 run *before* the work instead of during it:
 - **Contracts and dependencies** — what it consumes and produces, from
   and to which capabilities.
 
-## The paper trail — write it the moment it resolves, never batched
+## The running state — visible the moment it resolves, never in the file
 
-- **Terms → the spec's Capability language section**, as an
+The spec file is written once, at the end, by `/to-spec` —
+interviewing and editing an artifact at the same time forces the human
+to review a moving file while still answering questions. During the
+interview, everything except ADRs lives in a running structured
+summary **in the conversation**:
+
+- **Terms → the summary, in the Capability-language format** — an
   *opinionated glossary*: when multiple words exist for one concept,
   pick the best and ban the rest —
 
@@ -109,8 +123,8 @@ Phase 1.5 run *before* the work instead of during it:
   concepts don't belong. The glossary stays devoid of implementation
   details: it is a glossary and nothing else (rules go to EARS,
   values to the reference table, decisions to ADRs).
-- **Rules → Business rules (EARS)**, drafted as agreed.
-- **Values → reference-table rows**, as collected.
+- **Rules → the summary, in EARS**, drafted as agreed.
+- **Values → the summary's reference rows**, as collected.
 - **Decisions → an ADR at
   `architecture/decisions/YYYY-MM-DD-slug.md`** (the system's declared
   ADR home; date-prefixed like the walkthroughs, so the folder
@@ -130,11 +144,15 @@ Phase 1.5 run *before* the work instead of during it:
 ## The grill-back (final phase of spec modes; the whole session in
 refine mode)
 
-Before writing the final document, interrogate the draft:
+Before handing off to `/to-spec`, interrogate the assembled summary
+(an objection here reopens branches — recompute the frontier and keep
+going):
 
-- **Divergence probe:** could two materially different implementations
-  both be defended under this text? Wherever yes, the spec is ambiguous
-  *there* — tighten it.
+- **Divergence probe:** could two implementations that differ in
+  **business behavior** both be defended under this text? Wherever
+  yes, the spec is ambiguous *there* — tighten it. (Technical
+  diversity beneath unchanged behavior is freedom, not ambiguity —
+  the spec fixes the what; the how stays the builder's.)
 - **Boundary probe:** zero, negative, enormous, duplicate, concurrent,
   out-of-order — does a rule answer each, or is it deliberately out of
   scope?
@@ -146,26 +164,30 @@ Before writing the final document, interrogate the draft:
 
 ## Output
 
-- **Spec modes:** write `specs/<capability>/<capability>.md` from the
-  template, report the path, and list 3-5 open questions if ambiguity
-  remains — unresolved ambiguity belongs in open questions, never
-  silently filled with a default. The spec is committed before any
-  implementation issue references it: the spec is the first commit.
+- **Spec modes (create or refine): do NOT write or edit the spec
+  file.** End with the running summary organized by template section
+  (language, rules, criteria, values, non-goals, contracts) plus 3-5
+  open questions if ambiguity remains — then hand off: **run
+  `/to-spec` to write the file.** Unresolved ambiguity belongs in the
+  open questions, never silently filled with a default.
 - **Task mode:** the refined task text (title, context, binary
   acceptance criteria pointing at the spec where one exists, edge
   cases, out-of-scope), paste-ready for the issue.
 
-Spec creation is always human-validated: this command structures the
-interview; the human is the source of business truth.
+The human is the source of business truth: this command structures the
+interview; `/to-spec` materializes it; nothing is invented on the
+way.
 
 Portability: this command's body works as a standalone prompt — paste
 it into any chat, point it at the target, same interview.
 
 ---
 
-Interview mechanics (one question at a time, recommended answers,
-explore-the-codebase-instead, "shared understanding" as the stop) and
-the paper-trail discipline (opinionated glossary, minimal ADRs)
-adapted from Matt Pocock's `grilling` and `domain-modeling` skills.
+Interview mechanics (frontier rounds from his `batch-grill-me`: the
+design tree, every unblocked question at once, non-blocking
+fact-finding; recommended answers; explore-the-codebase-instead;
+"shared understanding" as the stop) and the paper-trail discipline
+(opinionated glossary, minimal ADRs) adapted from Matt Pocock's
+`grilling`, `batch-grill-me`, and `domain-modeling` skills.
 The input modes, the fact-vs-intent law, numbers-before-prose, the
 completeness model, and the grill-back are this system's.

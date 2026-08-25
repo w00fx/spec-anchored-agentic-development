@@ -1,6 +1,6 @@
 ---
-description: Break a capability spec (or the shaping conversation that produced it, or a parent issue) into tracer-bullet tickets — vertical slices anchored on the spec's numbered acceptance criteria, each declaring its blocking edges. Quizzes the human on the breakdown, then publishes to a local tickets.md or to GitHub Issues with real blocking links.
-argument-hint: [spec path | parent issue | default: this session's shaping]
+description: Break a capability spec (or the shaping conversation that produced it, or a parent issue) into tracer-bullet tickets — vertical slices anchored on the spec's pointed stable IDs (typed, never renumbered), each declaring its blocking edges. Quizzes the human on the breakdown, then publishes to a local tickets.md or to GitHub Issues with real blocking links.
+argument-hint: "[spec path | parent issue | default: this session's shaping]"
 ---
 
 Break the work into **tracer-bullet tickets** — vertical slices, each
@@ -9,12 +9,13 @@ human approves the breakdown.
 
 ## 1. Gather context
 
-Work from whatever is already in the conversation (a `/shape` session
-that just produced a spec is the common case). If the argument is a
+Work from whatever is already in the conversation (a `/shape` →
+`/to-spec` session that just produced the spec is the common case). If the argument is a
 spec path, read it in full; if it is an issue number or URL, fetch its
 full body and comments.
 
-**Gate: the spec must be committed before any ticket references it** —
+**Gate: the spec must be committed AND `status: ratified` before any
+ticket references it** (a draft — even committed — feeds nothing) —
 the spec is the first commit. If the spec exists only in this
 conversation, stop and commit it first (human-approved, as always for
 spec content). Tickets point at `specs/<capability>/…` at a real path
@@ -35,11 +36,11 @@ own ticket(s), blocking the slices they enable.
 
 - Each slice cuts a narrow but COMPLETE path through every layer
   (schema → logic → surface → tests) — vertical, NOT a horizontal
-  slice of one layer. Horizontal slices produce nothing a `/goal`
-  condition can verify.
-- **Each slice anchors on 1-4 of the spec's numbered acceptance
-  criteria — pointing at the items, never copying them.** The spec's
-  numbering is the addressing scheme; a restated one-liner for
+  slice of one layer. Horizontal slices produce nothing demonstrable
+  and mergeable end-to-end.
+- **Each slice anchors on 1-4 of the spec's pointed stable IDs**
+  (`AC-<CAP>-###` / `BR-<CAP>-###`) — the typed ID is the addressing
+  scheme; a restated one-liner for
   readability is fine, but the pointer is what is load-bearing.
 - A completed slice is demoable or verifiable on its own, and leaves
   the system green: a mergeable PR, no broken intermediate state.
@@ -101,7 +102,10 @@ tickets; only the shape of the edges changes:
   build, the source spec reference, and the frontier rule.
 - **GitHub Issues** (parallel / the autonomous route): one issue per
   ticket, in dependency order; native blocking / sub-issue links where
-  the tracker has them, otherwise "Blocked by: #N" in the body. Apply
+  the tracker has them, AND always "Blocked by: #N" in the body — **the
+body field is the authority the orchestrator parses**; native links
+are a mirror, and divergence between the two is fixed before
+scheduling. Apply
   the project's label schema (`stage:` / `area:` / type / priority).
   The tickets are agent-grabbable by construction — but apply
   `auto-implement` ONLY per the narrow-start allowlist: the autonomous
@@ -114,15 +118,31 @@ Do NOT close or modify any parent issue.
 ```markdown
 ## <Title, in the capability language>
 
-**Spec:** specs/<capability>/<capability>.md — criteria <N-M>
+**Spec:** specs/<capability>/<capability>.md @ commit <full-SHA> — criteria
+[AC-<CAP>-###, …] (typed stable IDs — never renumbered;
+retired, not deleted; the readiness lens checks these same IDs)
 
 **What to build:** the end-to-end behaviour this ticket makes work,
 from the user's perspective — not a layer-by-layer implementation list.
 
-**Acceptance criteria:** spec items <N-M>, one readable line each,
-pointing at the spec — the spec text is the truth.
+**Acceptance criteria:** the pointed IDs, one readable line each —
+the spec text is the truth.
+
+**Scope / non-goals:** what is explicitly out.
+
+**Test scenarios:** the cases a worker must cover.
+
+**Risk / rollout:** flag, kill-switch, rollback — when behavior is
+user-visible or destructive; else "low / n/a".
 
 **Blocked by:** #<id> <title>, … — or "None — can start immediately".
+
+When a batch is expand–contract (green state only exists on an
+integration branch), declare it: `change_kind:
+coordinated-expand-contract`, the merge order (expand → migrate →
+contract), per-ticket CI expectations, and the rollback boundary —
+this path never looks like a normal run eligible for autonomy
+allowlists.
 ```
 
 Avoid specific file paths or code snippets in tickets — they go stale
@@ -134,10 +154,16 @@ decision-rich parts.
 ## After publishing
 
 Work the **frontier** — any ticket whose blockers are all done — one
-ticket per fresh session: locally via the supervised `/goal` recipes,
+ticket per fresh session: locally via a direct `/implement-feature`,
 or through the autonomous route when the narrow-start conditions hold.
 Parallel work = parallel sessions (worktrees) on frontier tickets with
 disjoint scopes.
+
+Before presenting the approval quiz, dispatch a fresh-context reviewer
+with the **ticket-readiness-review** lens over the generated batch and
+fold its table (`| # | Ready? | Blockers |`) into the quiz — the human
+approves the graph seeing which tickets are executable contracts and
+which need work before any worker ever meets them.
 
 ---
 
@@ -145,3 +171,6 @@ Ticket mechanics (tracer bullets, blocking edges, the frontier,
 expand–contract, the approval quiz) adapted from Matt Pocock's
 `to-tickets` skill. The spec anchoring, run-budget sizing, risk
 sequencing, and autonomous gating are this system's.
+
+Portability: this command's body works as a standalone prompt in any
+harness — the semantic procedure is portable; invocation, permissions, and context loading need the harness adapter.
