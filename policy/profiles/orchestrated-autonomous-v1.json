@@ -1,0 +1,35 @@
+{
+  "adapters": [
+    "implement-orchestrated"
+  ],
+  "denied_path_patterns": [],
+  "execution_mode": "autonomous",
+  "forbidden_path_patterns": [
+    "**",
+    "*"
+  ],
+  "golden_oracle": "human-only",
+  "governance": "deny",
+  "max_exact_paths": 20,
+  "max_recursive_scope_patterns": 4,
+  "max_scope_roots": 4,
+  "metrics_baseline": "human-only",
+  "pattern_grammar": {
+    "forbid_intermediate_wildcard": true,
+    "forbid_leading_wildcard": true,
+    "forms": [
+      "exact",
+      "trailing-recursive"
+    ],
+    "minimum_literal_segments": 2
+  },
+  "permission_ceiling": {
+    "data_migration": false,
+    "dependency_change": false,
+    "external_side_effect": false,
+    "schema_change": false
+  },
+  "profile_id": "orchestrated-autonomous/v1",
+  "requires_scope_roots": true,
+  "spec_semantics": "proposal-only"
+}
