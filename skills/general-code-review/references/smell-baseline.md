@@ -45,3 +45,23 @@ Three binding rules govern their use:
 Curated in Matt Pocock's `code-review` skill from Fowler, *Refactoring*
 ch. 3. The severity cap, boundary cross-references, and
 tooling-deference rule are this system's.
+
+**The paragraph-comment smell** (field-proven at 1M lines — source #36):
+a workaround that needs a paragraph-long comment justifying why it is
+OK is wrong code — fix the code, not the comment. Long explanatory
+comments wrapped around workarounds are a reviewer trigger; capped at
+[SHOULD] like the rest of this baseline.
+
+**Three mechanized reward-hacking smells** (Cognition, production —
+source #52; each is deterministically lintable, and the lint is the
+better home where it exists):
+
+- **getattr-so-it-never-errors** — defensive `getattr`/`hasattr` (or
+  optional-chaining equivalents) on attributes the code *knows* exist,
+  so the code cannot fail. Cognition's lint **fails the PR** on it.
+- **Backwards-compatibility-at-all-costs** — import/export shims and
+  re-exports added so nothing ever has to be renamed or moved; the
+  diff avoids failure instead of finishing the change.
+- **Untyped escape hatches** — untyped tuples, `dict[str, Any]`,
+  `any` where a real type was one line away: the type system dodged
+  so the code cannot be told it's wrong.

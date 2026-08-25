@@ -2,7 +2,7 @@
 name: conformance-review
 description: >
   Use when the reviewer subagent is reviewing a diff that implements work
-  defined by a capability spec or an approved Phase 2 plan. Checks two things: does the diff do what the spec requires, and does the
+  defined by a capability spec or an approved plan (protocol Phase 3). Checks two things: does the diff do what the spec requires, and does the
   diff do what the approved plan said it would. Catches silent drift between
   intent and implementation. Apply on top of general-code-review for any
   spec- or plan-driven change.
@@ -18,7 +18,7 @@ A diff can be clean, well-tested, and constitution-compliant, and still implemen
 
 ## When to Use
 
-- A code-review subagent is reviewing a diff that implements a capability spec or an approved Phase 2 plan.
+- A code-review subagent is reviewing a diff that implements a capability spec or an approved plan (protocol Phase 3).
 
 **Not for:** general correctness/simplicity/tests (use `general-code-review`); constitution/domain-rule violations (use `constitution-compliance-review`); exploratory diffs with no spec or plan behind them.
 
@@ -42,7 +42,7 @@ The spec is the business source of truth. Read the relevant capability spec and 
 
 ## Dimension 2 — Diff vs approved plan (intent vs implementation)
 
-The Phase 2 plan stated an approach and a committed file scope, reviewed and approved before code. Your baseline is the **latest approved plan** — the original plus any approved replans (delta revisions) and approved scope expansions pasted with it. An approved replan is the new baseline, not a divergence; what you flag is unapproved deviation from that baseline. Compare the diff against it:
+The plan (protocol Phase 3) stated an approach and a committed file scope, reviewed and approved before code. Your baseline is the **latest approved plan** — the original plus any approved replans (delta revisions) and approved scope expansions pasted with it. An approved replan is the new baseline, not a divergence; what you flag is unapproved deviation from that baseline. Compare the diff against it:
 
 - **Approach drift:** the diff took a different approach than the plan described. Maybe the new approach is fine — but it wasn't the one reviewed, so it hasn't been vetted. Flag the divergence so it gets a second look, don't wave it through because "it works."
 - **Scope drift:** the diff edits files outside the committed scope (beyond any *approved* scope changes), or skips files the plan said it would touch. In `implement-backlog` this should have aborted; if it reached you, it's a [BLOCKER]. In `implement-feature` it should have been surfaced for human approval.

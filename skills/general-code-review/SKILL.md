@@ -100,6 +100,15 @@ For each finding: **dimension** (correctness / simplicity / test / type / commit
 | "I mocked everything so the test is isolated" | Isolation via heavy mocking often tests the mocks. Test through real collaborators; mock only true boundaries. |
 | "The cast is fine, I know the type" | A cast that papers over a mismatch is a runtime crash waiting for the input you didn't picture. Fix the type. |
 
+## UI diffs — the judge gets eyes
+
+When the diff touches user-facing web UI and a preview is reachable,
+open it with the repo's declared browser instrument (`agent-browser`;
+load its guide via `skills get core` first) and look: does the changed
+flow actually work, does the console stay clean? A UI review that
+never rendered the UI is reading sheet music and calling it a concert.
+Findings stay report-only, as always.
+
 ## Red flags — STOP
 
 - Approving a diff whose new behavior has **no test that would fail if it broke**.
