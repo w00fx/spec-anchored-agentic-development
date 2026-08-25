@@ -1,0 +1,1310 @@
+#!/usr/bin/env python3
+"""spec-anchored — executable contracts for the implementation protocol.
+
+Tool-neutral, dependency-free, deterministic, **fail-closed**.
+
+  canonicalize      canonical bytes/hash for a JSON object or a text body
+  build-approval    canonical approval bundle -> APPROVAL-FINGERPRINT
+  verify-approval   an approval record against a bundle fingerprint
+  validate-scope    git diff --name-status against a scope manifest
+  validate-result   a run's result.json against the terminal contract
+
+Design rules
+  - Every parser refuses what it does not fully understand. Silence is
+    never consent: an unreadable diff line is a violation, not zero
+    changes.
+  - denied_paths is absolute. No policy, truth type, or expansion can
+    reclassify a denied path into an allowed one.
+  - Truth is typed: spec semantics, golden oracle, and metrics
+    baseline each need their own grant. A spec amendment never
+    authorizes moving the oracle it is checked against.
+  - Acyclic identity: an artifact never carries the hash of an object
+    that depends on it.
+  - Shape validation is not environment verification. These commands
+    prove an artifact is well-formed and internally consistent; they
+    do NOT prove a PR, commit, or review exists. That is the job of
+    the (still unbuilt) verify-*-against-environment family.
+"""
+import sys, re, json, hashlib, argparse, datetime
+
+SCHEMA_VERSION = 1
+
+
+class ResolvedPolicy(dict):
+    """A policy that has already passed `resolve_policy`.
+
+    JSON can never produce this type, so resolution is idempotent
+    without a second canonical-equality check — which is what made a
+    legitimate overlay unusable through the CLI (closure v1, P0-01).
+    """
+
+
+class ContractViolation(ValueError):
+    """A refusal BY THE CONTRACT.
+
+    Distinguished from a programming bug on purpose: fixtures assert
+    this specific type, so a parser that starts crashing (RuntimeError,
+    TypeError, NameError) instead of refusing cleanly turns the suite
+    red rather than passing as a "refusal" (eleventh audit, P0-02).
+    """
+CANON_ALGO = "sa-canon/1"
+
+TERMINALS = ("PR_READY_AWAITING_HUMAN", "NAMED_BLOCKER", "NO_CHANGE_REQUIRED")
+CLASSIFICATIONS_TERMINAL = ("ALREADY_SATISFIED", "STALE_REQUEST")
+CLASSIFICATIONS_BLOCKING = ("WRONG_SYSTEM", "UNVERIFIABLE")
+BLOCKER_KINDS = ("AMBIGUITY", "MISSING_ORACLE", "TRUTH_CONFLICT",
+                 "SCOPE_VIOLATION", "SPEC_CHANGE_REQUIRED", "SPEC_STALE",
+                 "GRAPH_DECISION_REQUIRED", "ENVIRONMENT", "REPEATED_FAILURE")
+CLAIM_STATES = ("parked", "released")
+MERGE_CLAIMS = ("merged", "landed", "auto-merged", "merge_complete")
+
+TRUTH_ROOTS = {
+    "spec_semantics": ["specs/**"],
+    "golden_oracle": ["**/golden/**", "tests/golden/**", "**/*.golden", "**/goldens/**"],
+    "metrics_baseline": [".metrics-baseline.json", "**/.metrics-baseline.json"],
+}
+TRUTH_GRANT = {
+    "spec_semantics": ("policy", "allowed_spec_paths", "semantic-amendment"),
+    "golden_oracle": ("golden_policy", "allowed_golden_paths", "gated"),
+    "metrics_baseline": ("baseline_policy", "allowed_baseline_paths", "gated"),
+}
+PERMISSION_TRIGGERS = {
+    "dependency_change": ["**/requirements.txt", "requirements/*.txt", "**/package.json",
+                          "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml",
+                          "**/go.mod", "**/go.sum", "**/Cargo.toml", "**/Cargo.lock",
+                          "**/pyproject.toml", "**/poetry.lock", "**/uv.lock",
+                          "**/Gemfile", "**/Gemfile.lock", "**/pom.xml",
+                          "**/build.gradle", "**/build.gradle.kts", "**/*.csproj",
+                          "**/composer.json", "**/composer.lock", "**/mix.exs",
+                          "requirements.txt", "package.json", "go.mod", "Cargo.toml",
+                          "pyproject.toml", "uv.lock", "pom.xml", "build.gradle"],
+    "schema_change": ["**/migrations/**", "**/schema.sql", "**/*.prisma",
+                      "**/schema.graphql", "db/schema.rb", "**/schema.json",
+                      "**/openapi.yaml", "**/openapi.yml", "**/openapi.json",
+                      "**/*.proto", "**/swagger.yaml"],
+    "data_migration": ["**/migrations/**", "**/seeds/**", "**/fixtures/data/**",
+                       "**/migrate_*.py", "**/migrate-*.sql", "**/backfill_*.py"],
+    # external_side_effect cannot be inferred from paths: declared-only,
+    # enforced by review. Documented so nobody mistakes silence for a check.
+}
+# ---------------------------------------------------------------------
+# Policy floor: issued by the launcher/human, NOT by the worker.
+# The scope manifest is a proposal; it must be a subset of the profile.
+# Without a profile, validate-scope refuses to judge: a worker that
+# declares its own authorization is not authorized.
+# ---------------------------------------------------------------------
+# Governance is modelled as SURFACES, not as an inventory of today's
+# files: a new validator, a new composite action, or a doctrine edit
+# must be covered without anyone remembering to add it to a list
+# (eleventh audit, P0-06). Changing any of these is a separate
+# harness-hardening flow with its own reviewers and evals.
+GOVERNANCE_SURFACES = {
+    # the harness's own gates — NOT the project's tests, which are the
+    # normal work product of almost every ticket
+    # `scripts/**` is deliberately broad: a NEW validator or gate added
+    # under scripts/ must be covered without anyone updating a list.
+    # `tests/**` is deliberately NOT: the project's tests are the work
+    # product of almost every ticket, so only the harness's own suites
+    # are governance.
+    # `scripts/**` stays reserved so a NEW gate added there is covered without
+    # anyone updating a list; a repository whose `scripts/` holds product code
+    # installs the harness under `.spec-anchored/` instead (policy/README.md).
+    # Product tests are NOT captured — only the harness's own suites.
+    "harness code and gates": ["scripts/**", ".spec-anchored/**",
+                               "tests/_harness.py", "tests/test_kernel*.py",
+                               "tests/test_corpus*.py", "tests/test-mutants.py"],
+    "policy": ["policy/**"],
+    "agent definitions": [".claude/**", ".agents/**", "agent-system/**",
+                          ".codex/**", "reviewer-system/**", "commands/**",
+                          "protocols/**", "rules/**", "routines/**",
+                          "implement-*/**", "adaptations/**"],
+    "CI and automation": [".github/**", ".gitlab-ci.yml", "azure-pipelines.yml"],
+    "spec templates": ["spec-templates/**"],
+    "doctrine": ["GUIDELINE*.md", "AUTONOMY-PLAYBOOK.md", "INSTALL.md",
+                 "sources-and-learnings.md"],
+    # the instructions the run itself is judged under: a run that can
+    # edit its own operating context can change the rule and then work
+    # under the new one (twelfth audit, P0-03)
+    "operational context": ["AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md",
+                            "CLAUDE-*.md", "**/CLAUDE-*.md", ".cursorrules",
+                            "architecture/constitution.md",
+                            "architecture/**/constitution*.md",
+                            "**/constitution.md"],
+    "eval definitions": ["EVALS*.md", "evals/spec-anchored/**",
+                         "eval-results/spec-anchored/**"],
+}
+GOVERNANCE_FLOOR = [p for pats in GOVERNANCE_SURFACES.values() for p in pats]
+PROFILES = {
+    "supervised-local/v1": {
+        "execution_mode": "supervised",
+        "adapters": ["implement-feature"],
+        "spec_semantics": "gated", "golden_oracle": "human-only",
+        "metrics_baseline": "human-only", "governance": "deny"},
+    "orchestrated-assisted/v1": {
+        "execution_mode": "assisted",
+        "adapters": ["implement-orchestrated"],
+        "spec_semantics": "proposal-only", "golden_oracle": "human-only",
+        "metrics_baseline": "human-only", "governance": "deny"},
+    "orchestrated-autonomous/v1": {
+        "execution_mode": "autonomous",
+        "adapters": ["implement-orchestrated"],
+        "spec_semantics": "proposal-only", "golden_oracle": "human-only",
+        "metrics_baseline": "human-only", "governance": "deny"},
+    "unattended/v1": {
+        "execution_mode": "unattended",
+        "adapters": ["implement-backlog"],
+        "spec_semantics": "proposal-only", "golden_oracle": "human-only",
+        "metrics_baseline": "human-only", "governance": "deny",
+        # ordinary-code breadth is a policy question too: an unattended
+        # run may not claim the whole tree as its surface (P1-03)
+        "forbidden_path_patterns": ["**", "*", "src/**", "**/*"]},
+}
+# High-risk permission ceilings: the manifest may only go BELOW them.
+# A worker that grants itself dependency, schema or data-migration
+# rights is authorizing itself (closure v1, P0-03).
+_OPEN = {"dependency_change": True, "schema_change": True,
+         "data_migration": True, "external_side_effect": True}
+_SHUT = {k: False for k in _OPEN}
+for _pid, _p in PROFILES.items():
+    _supervised = _p["execution_mode"] == "supervised"
+    _p.setdefault("permission_ceiling", dict(_OPEN) if _supervised else dict(_SHUT))
+    _p.setdefault("denied_path_patterns", [])
+    # Autonomous and unattended runs need POSITIVE roots issued outside the run:
+    # without them the worker still picks its own ordinary-code surface, and
+    # breadth is rebuilt by enumeration (closure v2, P0-01).
+    _p.setdefault("requires_scope_roots",
+                  _p["execution_mode"] in ("autonomous", "unattended"))
+    _p.setdefault("max_scope_roots", 4 if _p["execution_mode"] in ("autonomous", "unattended") else None)
+    # two DIFFERENT limits, named apart after closure v3 P1: how many roots the
+    # launcher may authorize, and how many recursive patterns a manifest may
+    # select inside them.
+    _p.setdefault("max_recursive_scope_patterns",
+                  4 if _p["execution_mode"] in ("autonomous", "unattended") else None)
+    _p.setdefault("max_exact_paths", 20 if _p["execution_mode"] in ("autonomous", "unattended") else None)
+    _p.setdefault("forbidden_path_patterns",
+                  ["**", "*"] if _p["execution_mode"] in ("autonomous", "unattended") else [])
+    # Closed pattern grammar rather than a blacklist of spellings:
+    # `src/**/*` and `**/src/**` are as broad as `src/**` (P0-04).
+    _p.setdefault("pattern_grammar",
+                  {"forms": ["exact", "trailing-recursive"],
+                   "minimum_literal_segments": 2,
+                   "forbid_leading_wildcard": True,
+                   "forbid_intermediate_wildcard": True}
+                  if not _supervised else
+                  {"forms": ["exact", "trailing-recursive", "free"],
+                   "minimum_literal_segments": 1,
+                   "forbid_leading_wildcard": False,
+                   "forbid_intermediate_wildcard": False})
+
+
+def pattern_violation(pattern, grammar):
+    """Why this allowed_paths entry is not admissible under the grammar."""
+    bad = canonical_violation(pattern, kind="pattern" if is_pattern(pattern) else "exact")
+    if bad:
+        return bad
+    segments = pattern.split("/")
+    if grammar.get("forbid_leading_wildcard") and set(segments[0]) & GLOB_CHARS:
+        return "starts with a wildcard segment"
+    literal = [s for s in segments if not (set(s) & GLOB_CHARS)]
+    if len(literal) < grammar.get("minimum_literal_segments", 0):
+        return ("needs at least %d literal path segments to be a scope rather "
+                "than the tree" % grammar["minimum_literal_segments"])
+    if "free" in grammar.get("forms", []):
+        return None
+    wild = [i for i, s in enumerate(segments) if set(s) & GLOB_CHARS]
+    if grammar.get("forbid_intermediate_wildcard") and any(i != len(segments) - 1 for i in wild):
+        return ("every wildcard must be the final segment; `src/*/foo/**` and "
+                "`src/pay/**/**` are intermediate-wildcard forms")
+    if wild and segments[-1] not in ("**",):
+        return "the recursive form must end in `**`"
+    return None
+# A truth type may only be written when the profile says "gated" AND the
+# manifest grants the exact path. "proposal-only" and "human-only" are
+# ceilings the worker cannot raise.
+TRUTH_PROFILE_KEY = {"spec_semantics": "spec_semantics",
+                     "golden_oracle": "golden_oracle",
+                     "metrics_baseline": "metrics_baseline"}
+ALLOWED_FORGE_HOSTS = ("github.com",)
+PROVIDERS = ("github", "gitlab", "local")
+RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")
+REPO_REF = re.compile(r"^[\w.\-]+/[\w.\-]+$")
+COMMENT_URL = re.compile(r"^https://[\w.\-]+/[\w.\-]+/[\w.\-]+/issues/\d+#issuecomment-\d+$")
+
+
+# Ceilings, ordered from most to least authority. An overlay may move
+# a ceiling DOWN this list, never up.
+CEILING_ORDER = ("gated", "proposal-only", "human-only")
+IMMUTABLE_POLICY_KEYS = ("profile_id", "execution_mode", "adapters", "governance")
+
+
+def _str_list(value, field):
+    """Validate every element before any set operation.
+
+    `set([{}])` raised TypeError — a programming failure where the
+    contract owes a refusal (closure v1, P1-01).
+    """
+    if not isinstance(value, list):
+        raise ContractViolation("%s must be a list" % field)
+    for item in value:
+        if not is_str(item):
+            raise ContractViolation("%s must be a list of strings (found %s)"
+                                    % (field, type(item).__name__))
+    return value
+
+
+def _policy_path(value, field, allow_glob):
+    """Canonical validation for every path-bearing POLICY field.
+
+    A malformed scope proposal may safely fail; a malformed AUTHORITY
+    artifact must not be accepted and then silently apply less than its
+    issuer intended. `"src/pay/secret/** "` was hashed as a deny and
+    matched nothing, because real diff paths are canonical (closure v3,
+    P0).
+    """
+    if allow_glob:
+        mode = "pattern" if is_pattern(value) else "exact"
+    else:
+        mode = "exact"
+    bad = canonical_violation(value, kind=mode)
+    if bad:
+        raise ContractViolation("%s: %r — %s" % (field, value, bad))
+    return value
+
+
+def _monotonic_merge(base, overlay):
+    """Effective policy whose authority is a SUBSET of the base's.
+
+    `dict.update()` let an overlay REPLACE a restriction with a looser
+    value — an overlay of `{"forbidden_path_patterns": []}` handed an
+    unattended run the whole repository (twelfth audit, P0-01). Every
+    key now merges by its own restrictive rule.
+    """
+    eff = dict(base)
+    for key, value in overlay.items():
+        if key in IMMUTABLE_POLICY_KEYS:
+            raise ContractViolation(
+                "overlay may not touch %r: mode, adapters, governance and profile "
+                "identity are the launcher's, not the run's" % key)
+        if key == "forbidden_path_patterns":
+            _str_list(value, "forbidden_path_patterns")
+            for pat in value:
+                if pat not in ("**", "*", "**/*"):     # the universal spellings
+                    _policy_path(pat, "forbidden_path_patterns", allow_glob=True)
+            dropped = set(base.get(key, [])) - set(value)
+            if dropped:
+                raise ContractViolation(
+                    "overlay drops forbidden patterns %s: an overlay may ADD "
+                    "restrictions, never remove them" % sorted(dropped))
+            eff[key] = sorted(set(base.get(key, [])) | set(value))
+        elif key == "allowed_operations":
+            _str_list(value, "allowed_operations")
+            for o in value:
+                if not GIT_STATUS.match(o):
+                    raise ContractViolation(
+                        "allowed_operations: %r is not a git status letter" % o)
+            existing = base.get(key)
+            if existing is not None and not set(value) <= set(existing):
+                raise ContractViolation(
+                    "overlay adds operations %s the base policy does not allow"
+                    % sorted(set(value) - set(existing)))
+            eff[key] = sorted(set(existing) & set(value)) if existing is not None else sorted(set(value))
+        elif key == "protected_path_classes":
+            if not isinstance(value, dict):
+                raise ContractViolation("protected_path_classes must be an object")
+            merged = {k: list(v) for k, v in (base.get(key) or {}).items()}
+            for perm, pats in value.items():
+                _str_list(pats, "protected_path_classes.%s" % perm)
+                for pat in pats:
+                    _policy_path(pat, "protected_path_classes.%s" % perm, allow_glob=True)
+                dropped = set(merged.get(perm, [])) - set(pats)
+                if dropped:
+                    raise ContractViolation(
+                        "overlay drops protected paths %s from %s" % (sorted(dropped), perm))
+                merged[perm] = sorted(set(merged.get(perm, [])) | set(pats))
+            eff[key] = merged
+        elif key == "denied_path_patterns":
+            _str_list(value, "denied_path_patterns")
+            for pat in value:
+                _policy_path(pat, "denied_path_patterns", allow_glob=True)
+            dropped = set(base.get(key, []) or []) - set(value)
+            if dropped:
+                raise ContractViolation(
+                    "overlay drops denied paths %s: denies are union-only" % sorted(dropped))
+            eff[key] = sorted(set(base.get(key, []) or []) | set(value))
+        elif key == "authorized_scope_roots":
+            _str_list(value, "authorized_scope_roots")
+            for root in value:
+                _policy_path(root, "authorized_scope_roots", allow_glob=False)
+            cap = overlay.get("max_scope_roots", base.get("max_scope_roots"))
+            if is_int(cap) and len(value) > cap:
+                raise ContractViolation(
+                    "authorized_scope_roots declares %d roots but max_scope_roots is %d "
+                    "— the limit binds the authorized set itself" % (len(value), cap))
+            existing = base.get(key)
+            if existing is not None and not set(value) <= set(existing):
+                raise ContractViolation(
+                    "overlay adds scope roots %s the base policy does not authorize"
+                    % sorted(set(value) - set(existing)))
+            eff[key] = sorted(set(value))
+        elif key in ("max_scope_roots", "max_exact_paths",
+                     "max_recursive_scope_patterns"):
+            if not is_int(value) or value < 0:
+                raise ContractViolation("%s must be a non-negative int" % key)
+            existing = base.get(key)
+            if existing is not None and value > existing:
+                raise ContractViolation(
+                    "overlay raises %s from %d to %d (limits only go down)"
+                    % (key, existing, value))
+            eff[key] = value
+        elif key in TRUTH_PROFILE_KEY:
+            if value not in CEILING_ORDER:
+                raise ContractViolation("%s: illegal ceiling %r" % (key, value))
+            if CEILING_ORDER.index(value) < CEILING_ORDER.index(base.get(key, "human-only")):
+                raise ContractViolation(
+                    "overlay may not raise the %s ceiling from %r to %r"
+                    % (key, base.get(key), value))
+            eff[key] = value
+        else:
+            raise ContractViolation(
+                "overlay may only narrow policy (%r is not a narrowing key)" % key)
+    return eff
+
+
+def resolve_policy(spec):
+    """Resolve a policy reference into the EFFECTIVE policy object.
+
+    Accepts ONLY: a known profile id, or `{base_profile, overlay}`.
+    A raw object is accepted solely when it is byte-identical to the
+    canonical resolution of the profile it names — otherwise anything
+    calling itself a policy could grant itself authority (twelfth
+    audit, P0-02). A policy is issued, never self-declared.
+    """
+    if isinstance(spec, ResolvedPolicy):
+        return spec
+    if is_str(spec):
+        base = PROFILES.get(spec)
+        if base is None:
+            raise ContractViolation("unknown policy profile %r" % spec)
+        return ResolvedPolicy(dict(base, profile_id=spec))
+    if not isinstance(spec, dict):
+        raise ContractViolation("policy must be a profile id or an object")
+    if "base_profile" in spec:
+        base = PROFILES.get(spec["base_profile"])
+        if base is None:
+            raise ContractViolation("unknown base_profile %r" % spec["base_profile"])
+        overlay = spec.get("overlay") or {}
+        if not isinstance(overlay, dict):
+            raise ContractViolation("policy overlay must be an object")
+        for k in spec:
+            if k not in ("base_profile", "overlay"):
+                raise ContractViolation("unknown policy key %r" % k)
+        eff = _monotonic_merge(dict(base, profile_id=spec["base_profile"]), overlay)
+        eff["profile_id"] = spec["base_profile"]
+        return ResolvedPolicy(eff)
+    pid = spec.get("profile_id")
+    if not is_str(pid) or pid not in PROFILES:
+        raise ContractViolation(
+            "a policy object must name a known profile_id, or use base_profile + "
+            "overlay: an unrecognised policy is a self-declaration, not an authority")
+    canonical = dict(PROFILES[pid], profile_id=pid)
+    if hash_json(dict(spec)) != hash_json(canonical):
+        raise ContractViolation(
+            "this policy object differs from the canonical %r artifact; issue it "
+            "as base_profile + overlay so the narrowing is explicit and provable" % pid)
+    return ResolvedPolicy(canonical)
+
+
+def is_int(x):
+    """True is an int in Python; a schema field must not accept it."""
+    return type(x) is int
+
+
+def is_str(x):
+    return type(x) is str
+
+
+GIT_STATUS = re.compile(r"^(?:[AMDTUX]|[RC]\d{0,3})$")
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+HEX40 = re.compile(r"^[0-9a-f]{40}$")
+ISSUE_REF = re.compile(r"^[\w.\-]+/[\w.\-]+#\d+$")
+RUN_ID = re.compile(r"^RUN-[\w.\-]{1,64}$")
+PR_URL = re.compile(r"^https://[\w.\-]+/[\w.\-]+/[\w.\-]+/pull/\d+$")
+# The matcher implements exactly these operators. The parser refuses
+# anything else, so a policy can never express a restriction the matcher
+# will not apply: `[secret]` used to be hashed as a character class and
+# matched only the literal brackets (closure v4, P0-01).
+# ONE operator table, consumed by both the parser and the matcher, ordered
+# longest token first so `**` is never read as two `*`. Publishing a bare
+# character set lost token identity: `("**","*","?")` and `("*","?")` share
+# one character set, so removing `**` passed the old fixture (v5, P1-01).
+OPERATOR_TOKENS = ("**/", "**", "*", "?")
+GLOB_CHARS = set("*?")
+# Punctuation that LOOKS like an operator elsewhere but is literal here. It is
+# refused in PATTERNS (an issuer must not express what the matcher will not
+# apply) and allowed in LITERAL paths, where `src/app/[id]/page.tsx` is just a
+# filename that Git tracks (v5, P0-01).
+PATTERN_LOOKALIKE_CHARS = set("[]{}!^@+")
+CONTROL_CHARS = set(chr(c) for c in list(range(0x00, 0x20)) + [0x7F])
+STABLE_ID = re.compile(r"^(BR|AC|INV|CTR|OR|QC|OBS|OQ)-[A-Z][A-Z0-9]*-\d{3,}$")
+
+
+def _no_dupes(pairs):
+    seen = {}
+    for k, v in pairs:
+        if k in seen:
+            raise ContractViolation("duplicate JSON key: %r (ambiguous document)" % k)
+        seen[k] = v
+    return seen
+
+
+def _reject_const(c):
+    raise ContractViolation("non-finite JSON constant: %s" % c)
+
+
+def strict_json_loads(text):
+    return json.loads(text, object_pairs_hook=_no_dupes, parse_constant=_reject_const)
+
+
+def canonical_json_bytes(obj):
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+def canonical_text_bytes(text, strict=True):
+    """CRLF->LF, trailing whitespace stripped, blank edges removed.
+
+    In strict mode a Markdown hard break (a line ending in two or more
+    spaces) is REFUSED rather than silently normalized away: otherwise
+    two plans that render differently could share one hash.
+    """
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    if strict:
+        for i, ln in enumerate(lines, 1):
+            if ln.strip() and re.search(r"\S {2,}$", ln):
+                raise ContractViolation(
+                    "line %d ends in a Markdown hard break; canonicalization "
+                    "would erase a rendering difference - rewrite the line" % i)
+    lines = [ln.rstrip() for ln in lines]
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def sha256_hex(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def hash_json(o):
+    return sha256_hex(canonical_json_bytes(o))
+
+
+def hash_text(t, strict=True):
+    return sha256_hex(canonical_text_bytes(t, strict))
+
+
+#: the ONE place an operator's meaning is defined; the parser publishes the
+#: same table, so a token can never exist in one and not the other.
+OPERATOR_SEMANTICS = {
+    "**/": "(?:.*/)?",   # zero or more path segments
+    "**":  ".*",         # crosses slashes
+    "*":   "[^/]*",      # zero or more non-slash characters
+    "?":   "[^/]",       # exactly one non-slash character
+}
+
+
+def _match(path, pattern):
+    rx, i = "", 0
+    while i < len(pattern):
+        for token in OPERATOR_TOKENS:          # longest first: ** before *
+            if pattern.startswith(token, i):
+                rx += OPERATOR_SEMANTICS[token]; i += len(token)
+                break
+        else:
+            rx += re.escape(pattern[i]); i += 1
+    return re.fullmatch(rx, path) is not None
+
+
+def is_pattern(value):
+    """A string is a glob expression only when it carries a real operator."""
+    return bool(set(value) & GLOB_CHARS)
+
+
+def canonical_violation(value, kind="path"):
+    """THE definition of a canonical repository path or pattern.
+
+    One parser for every surface — policy authority, manifest scope and
+    diff paths — with three modes, because conflating literal identity
+    with pattern expression banned valid filenames (v5, P0-01):
+
+    kind="path"     a literal path from the filesystem or a diff. Any
+                    character a repository may legally contain, so
+                    `src/app/[id]/page.tsx` passes; structure rules
+                    (controls, traversal, segments) still apply.
+    kind="exact"    a literal path used as a GRANT. Same as "path", but
+                    the matcher's own operators are refused so a grant
+                    can never be half a glob.
+    kind="pattern"  a glob expression: only the implemented operators,
+                    and no operator-lookalike punctuation.
+    """
+    if not is_str(value):
+        return "not a string"
+    if not value or value != value.strip():
+        return "empty or padded"
+    if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        return "absolute path"
+    if "\\" in value:
+        return "backslash separator (ambiguous across platforms)"
+    if any(ch in CONTROL_CHARS for ch in value):
+        return "control character"
+    if value.endswith("/"):
+        return "trailing slash"
+    segments = value.split("/")
+    for seg in segments:
+        if seg == "":
+            return "empty segment (leading, trailing or doubled slash)"
+        if seg == ".":
+            return "`.` segment"
+        if seg == "..":
+            return "parent traversal"
+    if kind == "path":
+        return None          # literal identity: any legal filename is legal
+    if kind == "exact":
+        if set(value) & GLOB_CHARS:
+            return ("uses a matcher operator (%s) where an exact path is required — "
+                    "a grant is never half a glob"
+                    % ", ".join(sorted(set(value) & GLOB_CHARS)))
+        return None
+    bad = sorted(set(value) & PATTERN_LOOKALIKE_CHARS)
+    if bad:
+        return ("uses %s, which looks like an operator but is matched literally "
+                "(implemented operators: %s) — express it as an exact path instead"
+                % (", ".join(repr(c) for c in bad), ", ".join(OPERATOR_TOKENS)))
+    for seg in segments:
+        if "**" in seg and seg != "**":
+            return "`**` must be a complete segment, not part of one"
+    return None
+
+
+def unsafe_path(p):
+    """Back-compat wrapper over the canonical parser (paths, not patterns)."""
+    return canonical_violation(p, kind="path")
+
+
+def truth_classes(path):
+    """EVERY truth class a path belongs to — most-restrictive-wins.
+
+    `specs/pay/golden/cases.json` is spec semantics AND the oracle; a
+    spec amendment alone must not authorize it (eleventh audit, P0-05).
+    """
+    return {kind for kind, pats in TRUTH_ROOTS.items()
+            if any(_match(path, p) for p in pats)}
+
+
+def truth_type(path):
+    """Back-compat single-class view; prefer truth_classes()."""
+    found = truth_classes(path)
+    for kind in TRUTH_ROOTS:
+        if kind in found:
+            return kind
+    return None
+
+
+BUNDLE_FIELDS = {
+    "schema_version": int, "run_id": str,
+    # what authorized this run — the human approves a mode, not just a diff
+    "adapter": str, "execution_mode": str, "policy_profile": str, "policy_sha256": str,
+    "ticket_ref": str, "ticket_body_sha256": str, "base_sha": str,
+    "spec_entrypoint": str, "spec_pinned_commit": str, "spec_corpus_sha256": str,
+    "plan_artifact_id": str, "plan_sha256": str,
+    "scope_manifest_sha256": str, "semantic_amendment_sha256": (str, type(None)),
+}
+FIELD_FORMATS = {
+    "run_id": RUN_ID, "ticket_ref": ISSUE_REF, "ticket_body_sha256": HEX64,
+    "base_sha": HEX40, "spec_pinned_commit": HEX40, "plan_sha256": HEX64,
+    "scope_manifest_sha256": HEX64, "spec_corpus_sha256": HEX64,
+    "policy_sha256": HEX64,
+}
+
+
+def build_approval(parts, policy=None, _shape_only=False):
+    """Returns (canonical bundle, APPROVAL-FINGERPRINT). Fails closed."""
+    if not isinstance(parts, dict):
+        raise ContractViolation("approval bundle is not an object")
+    unknown = sorted(set(parts) - set(BUNDLE_FIELDS))
+    if unknown:
+        raise ContractViolation("unknown bundle fields: %s (a bundle never carries "
+                         "its own fingerprint)" % unknown)
+    missing = sorted(set(BUNDLE_FIELDS) - set(parts))
+    if missing:
+        raise ContractViolation("approval bundle missing fields: %s" % missing)
+    for f, typ in BUNDLE_FIELDS.items():
+        val = parts[f]
+        if typ is int and not is_int(val):
+            raise ContractViolation("%s: expected a plain int, got %s" % (f, type(val).__name__))
+        if typ is str and not is_str(val):
+            raise ContractViolation("%s: expected a string, got %s" % (f, type(val).__name__))
+        if isinstance(typ, tuple) and not (val is None or is_str(val)):
+            raise ContractViolation("%s: expected a string or null, got %s" % (f, type(val).__name__))
+    if parts["schema_version"] != SCHEMA_VERSION:
+        raise ContractViolation("schema_version must be %d" % SCHEMA_VERSION)
+    for f, rx in FIELD_FORMATS.items():
+        if not rx.match(parts[f]):
+            raise ContractViolation("%s: malformed value %r" % (f, parts[f]))
+    amend = parts["semantic_amendment_sha256"]
+    if amend is not None and not HEX64.match(amend):
+        raise ContractViolation("semantic_amendment_sha256: malformed value")
+    bad = unsafe_path(parts["spec_entrypoint"])
+    if bad:
+        raise ContractViolation("spec_entrypoint: %s" % bad)
+    if not parts["spec_entrypoint"].startswith("specs/"):
+        raise ContractViolation("spec_entrypoint must live under specs/")
+    if policy is None and not _shape_only:
+        raise ContractViolation(
+            "build_approval requires the resolved policy: without it policy_sha256 "
+            "is a declaration, not a binding (pass policy=..., or _shape_only=True "
+            "when you explicitly want shape validation with no policy claim)")
+    if policy is not None:
+        effective = resolve_policy(policy)
+        if parts["policy_sha256"] != hash_json(effective):
+            raise ContractViolation(
+                "policy_sha256 does not match the resolved policy artifact "
+                "(a declared hash is an assertion; only a computed one binds)")
+        if parts["policy_profile"] != effective["profile_id"]:
+            raise ContractViolation("policy_profile does not name the resolved policy")
+    prof = PROFILES.get(parts["policy_profile"])
+    if prof is None:
+        raise ContractViolation("policy_profile: unknown profile %r (legal: %s)"
+                         % (parts["policy_profile"], sorted(PROFILES)))
+    if parts["execution_mode"] != prof["execution_mode"]:
+        raise ContractViolation("execution_mode %r contradicts profile %r"
+                         % (parts["execution_mode"], parts["policy_profile"]))
+    if parts["adapter"] not in prof["adapters"]:
+        raise ContractViolation("adapter %r is not allowed by profile %r"
+                         % (parts["adapter"], parts["policy_profile"]))
+    if not parts["plan_artifact_id"].strip():
+        raise ContractViolation("plan_artifact_id: the approved plan needs an address "
+                         "(e.g. issue-comment:12345) - a hash alone cannot bind "
+                         "an approval to the post it approved")
+    bundle = {f: parts[f] for f in sorted(BUNDLE_FIELDS)}
+    return bundle, hash_json(bundle)
+
+
+RECORD_FIELDS = {"schema_version": int, "approval_fingerprint": str,
+                 "approval_artifact_id": str, "approver": str,
+                 "approved_at": str, "provider": str,
+                 "repository": str, "run_id": str}
+
+
+def verify_approval(record, bundle, policy=None):
+    """The record proves the approval EVENT; the bundle proves the content.
+
+    Takes the bundle (not merely its fingerprint) so the record can be
+    bound to the same run and repository: a record naming another run
+    or repo is a replay, not an approval (eleventh audit, P0-04).
+    """
+    if not isinstance(bundle, dict):
+        raise ContractViolation(
+            "verify_approval needs the approval bundle, not a fingerprint: without "
+            "it the record's run and repository cannot be checked (twelfth audit)")
+    if policy is None:
+        raise ContractViolation(
+            "verify_approval requires the resolved policy: a record verified without "
+            "one proves nothing about the authority the run operated under")
+    _, expected_fingerprint = build_approval(bundle, policy=policy)
+    v = []
+    if not isinstance(record, dict):
+        return ["approval record is not an object"]
+    for f in sorted(set(RECORD_FIELDS) - set(record)):
+        v.append("approval record missing field: %s" % f)
+    for f in sorted(set(record) - set(RECORD_FIELDS)):
+        v.append("approval record has unknown field: %s" % f)
+    if v:
+        return v
+    if record["schema_version"] != SCHEMA_VERSION:
+        v.append("schema_version must be %d" % SCHEMA_VERSION)
+    if not HEX64.match(str(record["approval_fingerprint"])):
+        v.append("approval_fingerprint: malformed")
+    elif record["approval_fingerprint"] != expected_fingerprint:
+        v.append("approval record does not match this bundle "
+                 "(stale approval, or approval of a different object)")
+    for f, typ in RECORD_FIELDS.items():
+        if typ is int and not is_int(record[f]):
+            v.append("%s: expected a plain int" % f)
+        if typ is str and not is_str(record[f]):
+            v.append("%s: expected a string" % f)
+    for f in ("approval_artifact_id", "approver", "approved_at", "provider",
+              "repository", "run_id"):
+        if is_str(record[f]) and not record[f].strip():
+            v.append("%s: empty" % f)
+    if is_str(record["provider"]) and record["provider"] not in PROVIDERS:
+        v.append("provider: %r is not a known provider (legal: %s)"
+                 % (record["provider"], list(PROVIDERS)))
+    if is_str(record["approved_at"]):
+        stamp = record["approved_at"]
+        if not RFC3339.match(stamp):
+            v.append("approved_at: expected an RFC3339 timestamp")
+        else:
+            try:
+                datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            except ValueError:
+                v.append("approved_at: %r is not a real instant (shape is not a "
+                         "calendar)" % stamp)
+    if is_str(record["repository"]) and not REPO_REF.match(record["repository"]):
+        v.append("repository: expected owner/repo")
+    if is_str(record["run_id"]) and not RUN_ID.match(record["run_id"]):
+        v.append("run_id: malformed")
+    if bundle is not None:
+        if record.get("run_id") != bundle.get("run_id"):
+            v.append("approval record names run %r but the bundle is for %r "
+                     "(cross-run replay)" % (record.get("run_id"), bundle.get("run_id")))
+        repo_from_ticket = str(bundle.get("ticket_ref", "")).split("#")[0]
+        if record.get("repository") != repo_from_ticket:
+            v.append("approval record names repository %r but the ticket lives in %r "
+                     "(cross-repository replay)"
+                     % (record.get("repository"), repo_from_ticket))
+    return v
+
+
+# approved_expansions is deliberately absent: an expansion changes the
+# manifest, therefore its hash, therefore the approval bundle — a new
+# human approval. An "approved expansion" living inside the approved
+# object was circular (tenth audit, P0-04).
+MANIFEST_TOP = {"schema_version", "run_id", "capability", "adapter",
+                "execution_mode", "policy_profile", "semantic_scope",
+                "mechanical_scope", "truth_change"}
+TRUTH_KEYS = {"policy", "allowed_spec_paths", "golden_policy",
+              "allowed_golden_paths", "baseline_policy", "allowed_baseline_paths"}
+
+
+def validate_manifest(m):
+    v = []
+    if not isinstance(m, dict):
+        return ["scope manifest is not an object"]
+    for k in sorted(set(m) - MANIFEST_TOP):
+        v.append("unknown manifest key: %s" % k)
+    for k in ("schema_version", "run_id", "capability", "adapter",
+              "execution_mode", "policy_profile", "semantic_scope",
+              "mechanical_scope", "truth_change"):
+        if k not in m:
+            v.append("manifest missing required key: %s" % k)
+    if v:
+        return v
+    if not is_int(m["schema_version"]) or m["schema_version"] != SCHEMA_VERSION:
+        v.append("schema_version must be the plain int %d" % SCHEMA_VERSION)
+    if not (is_str(m["run_id"]) and RUN_ID.match(m["run_id"])):
+        v.append("run_id: malformed")
+    if not (is_str(m["capability"]) and m["capability"].strip()):
+        v.append("capability: empty or not a string")
+    sem = m["semantic_scope"]
+    if not isinstance(sem, dict):
+        v.append("semantic_scope must be an object with implements/verifies/non_goals")
+    else:
+        for k in sorted(set(sem) - {"implements", "verifies", "non_goals"}):
+            v.append("unknown semantic_scope key: %s (schemas are closed at every level)" % k)
+        for k in ("implements", "verifies", "non_goals"):
+            if not isinstance(sem.get(k), list):
+                v.append("semantic_scope.%s must be a list" % k)
+        for k in ("implements", "verifies"):
+            for item in (sem.get(k) or []) if isinstance(sem.get(k), list) else []:
+                if is_str(item) and not STABLE_ID.match(item):
+                    v.append("semantic_scope.%s: %r is not a typed stable ID "
+                             "(TYPE-<CAP>-###)" % (k, item))
+    if not is_str(m["policy_profile"]):
+        v.append("policy_profile must be a string, got %s" % type(m["policy_profile"]).__name__)
+    elif m["policy_profile"] not in PROFILES:
+        v.append("policy_profile: unknown profile %r" % m["policy_profile"])
+    for k in ("adapter", "execution_mode"):
+        if not is_str(m[k]):
+            v.append("%s must be a string, got %s" % (k, type(m[k]).__name__))
+    if isinstance(sem, dict):
+        for k in ("implements", "verifies", "non_goals"):
+            for item in (sem.get(k) or []) if isinstance(sem.get(k), list) else []:
+                if not is_str(item):
+                    v.append("semantic_scope.%s contains a non-string entry (%s)"
+                             % (k, type(item).__name__))
+    mech = m["mechanical_scope"]
+    if not isinstance(mech, dict):
+        return v + ["mechanical_scope is not an object"]
+    if not isinstance(m["truth_change"], dict):
+        return v + ["truth_change is not an object"]
+    if "allowed_operations" in mech:
+        _ops = mech["allowed_operations"]
+        if not isinstance(_ops, list):
+            v.append("mechanical_scope.allowed_operations must be a list of git status "
+                     "letters, got %s" % type(_ops).__name__)
+        else:
+            for o in _ops:
+                if not is_str(o):
+                    v.append("mechanical_scope.allowed_operations: %s is not a string"
+                             % type(o).__name__)
+                elif not GIT_STATUS.match(o):
+                    v.append("mechanical_scope.allowed_operations: %r is not a git "
+                             "status letter" % o)
+    for k in sorted(set(mech) - {"allowed_paths", "denied_paths", "permissions",
+                                 "allowed_operations"}):
+        v.append("unknown mechanical_scope key: %s (schemas are closed at every level)" % k)
+    for k in ("allowed_paths", "denied_paths", "permissions"):
+        if k not in mech:
+            v.append("mechanical_scope missing key: %s" % k)
+    if v:
+        return v
+    for k in ("allowed_paths", "denied_paths"):
+        if not isinstance(mech[k], list) or any(not isinstance(x, str) for x in mech[k]):
+            v.append("mechanical_scope.%s must be a list of strings" % k)
+            continue
+        for pat in mech[k]:
+            bad = canonical_violation(pat, kind="pattern" if is_pattern(pat) else "exact")
+            if bad:
+                v.append("mechanical_scope.%s: %r — %s (an authorization artifact "
+                         "has one spelling)" % (k, pat, bad))
+    perms = mech["permissions"]
+    if not isinstance(perms, dict):
+        v.append("mechanical_scope.permissions must be an object")
+    else:
+        for k in sorted(set(perms) - {"dependency_change", "schema_change",
+                                      "data_migration", "external_side_effect"}):
+            v.append("unknown permission: %s (a permission the validator does not "
+                     "know is not a permission it enforces)" % k)
+        for p in ("dependency_change", "schema_change", "data_migration",
+                  "external_side_effect"):
+            if p not in perms:
+                v.append("permissions missing declaration: %s" % p)
+            elif not isinstance(perms[p], bool):
+                v.append("permissions.%s must be a boolean" % p)
+    tc = m["truth_change"]
+    if not isinstance(tc, dict):
+        v.append("truth_change must be an object")
+    else:
+        for k in sorted(set(tc) - TRUTH_KEYS):
+            v.append("unknown truth_change key: %s" % k)
+        if tc.get("policy", "none") not in ("none", "semantic-amendment"):
+            v.append("truth_change.policy: illegal value %r" % tc.get("policy"))
+        for k in ("golden_policy", "baseline_policy"):
+            if tc.get(k, "none") not in ("none", "gated"):
+                v.append("truth_change.%s: illegal value %r" % (k, tc.get(k)))
+        for listkey, root, kind in (("allowed_spec_paths", "specs/", "spec_semantics"),
+                                    ("allowed_golden_paths", None, "golden_oracle"),
+                                    ("allowed_baseline_paths", None, "metrics_baseline")):
+            entries = tc.get(listkey, [])
+            if entries is None:
+                entries = []
+            if not isinstance(entries, list):
+                v.append("truth_change.%s must be a list, got %s"
+                         % (listkey, type(entries).__name__))
+                continue
+            for p in entries:
+                if not isinstance(p, str):
+                    v.append("%s: non-string entry" % listkey); continue
+                bad = canonical_violation(p, kind="exact")
+                if bad:
+                    v.append("%s: %r - %s (a wildcard grant is not a grant; exact "
+                             "paths only)" % (listkey, p, bad)); continue
+                if root and not p.startswith(root):
+                    v.append("%s: %r must live under %s" % (listkey, p, root))
+                if kind not in truth_classes(p):
+                    v.append("%s: %r is not %s truth" % (listkey, p, kind))
+    return v
+
+
+def parse_name_status(text, nul=False):
+    """git diff --name-status -> [(status, path), ...]. Fails closed.
+
+    Prefer `git diff --name-status -z --find-renames --find-copies` and
+    pass nul=True: the NUL form is the only unambiguous one when a
+    filename can contain spaces, quotes, or tabs.
+    """
+    out = []
+    if nul:
+        if text and not text.endswith("\x00"):
+            raise ContractViolation(
+                "NUL stream does not end with its terminator: a truncated record "
+                "must fail closed, not look like a complete diff")
+        fields = [f for f in text.split("\x00") if f != ""]
+        i = 0
+        while i < len(fields):
+            st = fields[i].strip()
+            if not GIT_STATUS.match(st):
+                raise ContractViolation("unreadable status field: %r" % st)
+            n = 2 if st[0] in "RC" else 1
+            if i + n >= len(fields):
+                raise ContractViolation("truncated name-status record")
+            for p in fields[i + 1:i + 1 + n]:
+                out.append((st, p))
+            i += 1 + n
+        return out
+    for lineno, line in enumerate(text.split("\n"), 1):
+        if not line.strip():
+            continue
+        cols = line.split("\t")
+        st = cols[0].strip()
+        if not GIT_STATUS.match(st):
+            raise ContractViolation("line %d: unreadable status %r (refusing to treat "
+                             "an unparsed diff as no changes)" % (lineno, st))
+        need = 3 if st[0] in "RC" else 2
+        if len(cols) != need:
+            raise ContractViolation("line %d: expected %d tab-separated columns for "
+                             "status %r, got %d" % (lineno, need, st, len(cols)))
+        raw = cols[1:3] if st[0] in "RC" else cols[1:2]
+        for p in raw:
+            if p != p.strip() or p.startswith('"'):
+                raise ContractViolation(
+                    "line %d: this path cannot be read unambiguously in the textual "
+                    "form (padding or git quoting). Use `git diff --name-status -z` "
+                    "so path bytes are preserved" % lineno)
+            out.append((st, p))
+    return out
+
+
+def validate_scope(manifest, changes, profile=None):
+    """Returns list of violations (empty = every path is authorized).
+
+    `profile` is the policy floor issued OUTSIDE the run (launcher,
+    harness, or human). It is mandatory: a manifest is a proposal, and
+    a worker that declares its own authorization is not authorized.
+    """
+    v = validate_manifest(manifest)
+    if v:
+        return ["manifest is not schema-valid; refusing to judge the diff"] + v
+    try:
+        profile = resolve_policy(profile)
+    except ContractViolation as e:
+        return ["no usable policy: the scope manifest is the worker's proposal, "
+                "never its authorization (%s)" % e]
+    if manifest["policy_profile"] != profile.get("profile_id"):
+        v.append("the manifest names profile %r but the run was authorized under %r"
+                 % (manifest["policy_profile"], profile.get("profile_id")))
+    if manifest["execution_mode"] != profile["execution_mode"]:
+        v.append("execution_mode %r contradicts the authorized profile %r"
+                 % (manifest["execution_mode"], profile["execution_mode"]))
+    if manifest["adapter"] not in profile["adapters"]:
+        v.append("adapter %r is not allowed under the authorized profile"
+                 % manifest["adapter"])
+    mech = manifest["mechanical_scope"]
+    allowed, denied = mech["allowed_paths"], mech["denied_paths"]
+    perms, tc = mech["permissions"], manifest["truth_change"]
+    grammar = profile.get("pattern_grammar") or {}
+    roots = profile.get("authorized_scope_roots")
+    if profile.get("requires_scope_roots") and not roots:
+        return v + ["this profile is not executable on its own: %s runs need a policy "
+                    "instance carrying authorized_scope_roots, issued by the launcher "
+                    "(a base profile constrains form, never surface)"
+                    % profile["execution_mode"]]
+    if roots:
+        norm = [r.rstrip("/") for r in roots]
+        for pat in allowed:
+            head = pat.split("*")[0].rstrip("/")
+            if not any(head == r or head.startswith(r + "/") for r in norm):
+                v.append("allowed_paths entry %r is outside every authorized scope root "
+                         "%s" % (pat, norm))
+        recursive = [p for p in allowed if set(p) & GLOB_CHARS]
+        exact = [p for p in allowed if not (set(p) & GLOB_CHARS)]
+        cap_patterns = profile.get("max_recursive_scope_patterns")
+        cap_exact = profile.get("max_exact_paths")
+        if cap_patterns is not None and len(recursive) > cap_patterns:
+            v.append("%d recursive scope patterns exceed the authorized maximum of %d "
+                     "(aggregate breadth is breadth)" % (len(recursive), cap_patterns))
+        if cap_exact is not None and len(exact) > cap_exact:
+            v.append("%d exact paths exceed the authorized maximum of %d (enumeration "
+                     "rebuilds breadth)" % (len(exact), cap_exact))
+    for pat in allowed:
+        if pat in (profile.get("forbidden_path_patterns") or []):
+            v.append("allowed_paths entry %r is broader than the authorized profile "
+                     "permits for %s runs" % (pat, profile["execution_mode"]))
+        why = pattern_violation(pat, grammar)
+        if why:
+            v.append("allowed_paths entry %r is not admissible under the %s pattern "
+                     "grammar: %s" % (pat, profile["execution_mode"], why))
+    # permission ceiling: the manifest may narrow, never widen
+    ceiling = profile.get("permission_ceiling") or {}
+    for perm, granted in (perms.items() if isinstance(perms, dict) else []):
+        if granted is True and ceiling.get(perm) is False:
+            v.append("manifest grants %s but the authorized profile's ceiling for %s "
+                     "runs is false — a run does not widen its own permissions"
+                     % (perm, profile["execution_mode"]))
+    # operations: profile ∩ manifest, and the manifest may not add
+    prof_ops = profile.get("allowed_operations")
+    ops = mech.get("allowed_operations")
+    if prof_ops is not None:
+        if ops is None:
+            ops = list(prof_ops)
+        elif not set(ops) <= set(prof_ops):
+            v.append("manifest allows operations %s the authorized profile does not"
+                     % sorted(set(ops) - set(prof_ops)))
+            ops = sorted(set(ops) & set(prof_ops))
+    if ops is not None:
+        if not isinstance(ops, list) or any(not is_str(o) or not GIT_STATUS.match(o)
+                                            for o in ops):
+            return v + ["mechanical_scope.allowed_operations must be a list of git "
+                        "status letters"]
+
+    for status, path in changes:
+        bad = canonical_violation(path, kind="path")
+        if bad:
+            v.append("%r: %s" % (path, bad)); continue
+
+        # 1. governance floor: the machine's own contracts are never
+        #    editable by a run, whatever the manifest says
+        if profile.get("governance") == "deny" and any(_match(path, g) for g in GOVERNANCE_FLOOR):
+            v.append("%s: governance floor (the run cannot rewrite the contracts, "
+                     "policies, or gates that judge it - use the harness-hardening "
+                     "flow)" % path)
+            continue
+
+        # 1b. policy-level denies bind every CHANGED PATH, not only manifest spellings
+        if any(_match(path, d) for d in (profile.get("denied_path_patterns") or [])):
+            v.append("%s: denied by the authorized policy (denied_path_patterns)" % path)
+            continue
+
+        # 2. deny is absolute - no policy or truth type reclassifies it
+        if any(_match(path, d) for d in denied):
+            v.append("%s: denied_paths is absolute (deny wins over every policy, "
+                     "truth type, and expansion)" % path)
+            continue
+
+        # 3. permissions bind wherever the path lands. The portable
+        #    defaults below can never be exhaustive across ecosystems,
+        #    so a profile may declare `protected_path_classes` — issued
+        #    by the launcher, never by the worker.
+        triggers = dict(PERMISSION_TRIGGERS)
+        for perm, extra in (profile.get("protected_path_classes") or {}).items():
+            triggers[perm] = triggers.get(perm, []) + list(extra)
+        for perm, pats in triggers.items():
+            if any(_match(path, p) for p in pats) and not perms.get(perm, False):
+                v.append("%s: touches %s which the manifest declares false" % (path, perm))
+
+        # 3b. declared operations, when the manifest narrows them
+        if ops is not None and status not in ops and status[0] not in ops:
+            v.append("%s: operation %r is outside allowed_operations %s"
+                     % (path, status, ops))
+
+        # 4. typed truth: EVERY class the path belongs to needs BOTH a
+        #    profile ceiling and an exact manifest grant (most-restrictive-wins)
+        kinds = truth_classes(path)
+        if kinds:
+            for kind in sorted(kinds):
+                pol_key, list_key, granting = TRUTH_GRANT[kind]
+                ceiling = profile.get(TRUTH_PROFILE_KEY[kind], "proposal-only")
+                if ceiling != "gated":
+                    v.append("%s: the authorized profile allows %s only as %r - the "
+                             "manifest cannot raise its own ceiling"
+                             % (path, kind, ceiling))
+                elif tc.get(pol_key, "none") != granting:
+                    v.append("%s: %s write requires truth_change.%s == %r "
+                             "(a spec amendment never authorizes the oracle)"
+                             % (path, kind, pol_key, granting))
+                elif path not in (tc.get(list_key, []) or []):
+                    v.append("%s: %s write outside %s (exact paths only)"
+                             % (path, kind, list_key))
+            continue
+
+        # 5. ordinary code must be inside the approved surface
+        if not any(_match(path, a) for a in allowed):
+            v.append("%s: outside allowed_paths" % path)
+    return v
+
+
+COMMON = {"schema_version", "run_id", "issue_ref", "terminal", "claim_state"}
+BY_TERMINAL = {
+    "PR_READY_AWAITING_HUMAN": {
+        "required": {"pr_url", "head_sha", "approval_fingerprint",
+                     "review_report_sha256", "review_seal_sha256"},
+        "forbidden": {"blocker_kind", "classification", "evidence_target_sha256",
+                      "corroborated"},
+        "claim": "parked"},
+    "NAMED_BLOCKER": {
+        "required": {"blocker_kind", "issue_comment_url"},
+        "forbidden": {"pr_url", "review_seal_sha256", "corroborated", "classification"},
+        "claim": "released"},
+    "NO_CHANGE_REQUIRED": {
+        "required": {"evidence_target_sha256", "review_report_sha256",
+                     "classification", "corroborated"},
+        "forbidden": {"pr_url", "head_sha", "review_seal_sha256", "blocker_kind"},
+        "claim": "released"},
+}
+HASHED = ("approval_fingerprint", "review_report_sha256", "review_seal_sha256",
+          "evidence_target_sha256")
+
+
+def validate_result(result):
+    v = []
+    if not isinstance(result, dict):
+        return ["result is not an object"]
+    term = result.get("terminal")
+    if term not in TERMINALS:
+        return ["illegal terminal: %r (legal: %s)" % (term, list(TERMINALS))]
+    spec = BY_TERMINAL[term]
+    known = COMMON | spec["required"] | spec["forbidden"]
+    for k in sorted(set(result) - known):
+        v.append("unknown field for %s: %s (strict union: no free fields)" % (term, k))
+    for f in sorted(COMMON - set(result)):
+        v.append("missing required field: %s" % f)
+    for f in sorted(spec["required"] - set(result)):
+        v.append("terminal %s requires field: %s" % (term, f))
+    for f in sorted(spec["forbidden"] & set(result)):
+        v.append("terminal %s must not carry %s (field belongs to another terminal)"
+                 % (term, f))
+    if v:
+        return v
+
+    if not is_int(result["schema_version"]) or result["schema_version"] != SCHEMA_VERSION:
+        v.append("schema_version must be the plain int %d" % SCHEMA_VERSION)
+    if not RUN_ID.match(str(result["run_id"])):
+        v.append("run_id: malformed")
+    if not ISSUE_REF.match(str(result["issue_ref"])):
+        v.append("issue_ref: malformed (expected owner/repo#N)")
+    if result["claim_state"] not in CLAIM_STATES:
+        v.append("claim_state: illegal value %r" % result["claim_state"])
+    elif result["claim_state"] != spec["claim"]:
+        v.append("terminal %s requires claim_state %r (got %r) - a claim outlives "
+                 "no terminal" % (term, spec["claim"], result["claim_state"]))
+    for f in HASHED:
+        if f in result and not HEX64.match(str(result[f])):
+            v.append("%s: not a sha256 hex digest" % f)
+    if term == "PR_READY_AWAITING_HUMAN":
+        if not HEX40.match(str(result["head_sha"])):
+            v.append("head_sha: expected a full 40-hex commit id")
+        if not PR_URL.match(str(result["pr_url"])):
+            v.append("pr_url: malformed")
+        elif str(result["pr_url"]).split("/")[2] not in ALLOWED_FORGE_HOSTS:
+            v.append("pr_url: host %r is not an allowed forge (%s)"
+                     % (str(result["pr_url"]).split("/")[2], list(ALLOWED_FORGE_HOSTS)))
+        else:
+            owner_repo = "/".join(str(result["pr_url"]).split("/")[3:5])
+            if owner_repo != str(result["issue_ref"]).split("#")[0]:
+                v.append("pr_url does not belong to the issue's repository")
+    if term == "NAMED_BLOCKER":
+        url = str(result["issue_comment_url"])
+        if not COMMENT_URL.match(url):
+            v.append("issue_comment_url: expected .../issues/<n>#issuecomment-<id>")
+        else:
+            parts_url = url.split("/")
+            host, repo = parts_url[2], "/".join(parts_url[3:5])
+            issue_no = parts_url[6].split("#")[0]
+            ref_repo, ref_no = str(result["issue_ref"]).split("#")
+            if host not in ALLOWED_FORGE_HOSTS:
+                v.append("issue_comment_url: host %r is not an allowed forge" % host)
+            if repo != ref_repo or issue_no != ref_no:
+                v.append("issue_comment_url points at %s#%s but the result is for %s "
+                         "(a blocker must be reported on its own issue)"
+                         % (repo, issue_no, result["issue_ref"]))
+    if term == "NAMED_BLOCKER" and result["blocker_kind"] not in BLOCKER_KINDS:
+        v.append("blocker_kind: illegal value %r (legal: %s)"
+                 % (result["blocker_kind"], list(BLOCKER_KINDS)))
+    if term == "NO_CHANGE_REQUIRED":
+        cls = result["classification"]
+        if cls in CLASSIFICATIONS_BLOCKING:
+            v.append("%s never resolves the graph - route it to NAMED_BLOCKER" % cls)
+        elif cls not in CLASSIFICATIONS_TERMINAL:
+            v.append("classification: illegal value %r (legal terminal "
+                     "classifications: %s)" % (cls, list(CLASSIFICATIONS_TERMINAL)))
+        if result["corroborated"] is not True:
+            v.append("NO_CHANGE_REQUIRED requires corroborated: true "
+                     "(a candidate is not a terminal)")
+    blob = json.dumps(result, ensure_ascii=False).lower()
+    for claim in MERGE_CLAIMS:
+        if '"%s"' % claim in blob:
+            v.append("a run never claims %r - merging is the human's act" % claim)
+    return v
+
+
+def _read(path):
+    if path == "-":
+        return sys.stdin.read()
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _policy_arg(value):
+    """Return the policy SPEC (id or artifact object), resolved exactly once
+    downstream. Resolving here and again inside the validator is what made a
+    valid overlay unusable (closure v1, P0-01)."""
+    if value in PROFILES:
+        return resolve_policy(value)
+    return resolve_policy(strict_json_loads(_read(value)))
+
+
+def _fail(msg):
+    print("FAIL - %s" % msg, file=sys.stderr)
+    return 1
+
+
+def _report(viol, ok_msg):
+    if viol:
+        print("FAIL - %d violation(s):" % len(viol))
+        for x in viol:
+            print("  -", x)
+        return 1
+    print(ok_msg)
+    return 0
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(prog="spec-anchored", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("canonicalize"); c.add_argument("file")
+    c.add_argument("--kind", choices=("json", "text"), default="text")
+    c.add_argument("--emit", choices=("hash", "bytes"), default="hash")
+    c.add_argument("--allow-hard-breaks", action="store_true")
+    b = sub.add_parser("build-approval"); b.add_argument("file")
+    b.add_argument("--policy", required=True,
+                   help="profile id or policy artifact; policy_sha256 is computed "
+                        "from it and a declared mismatch is refused")
+    a = sub.add_parser("verify-approval"); a.add_argument("record")
+    a.add_argument("--bundle", required=True)
+    a.add_argument("--policy", required=True)
+    s = sub.add_parser("validate-scope")
+    s.add_argument("--manifest", required=True); s.add_argument("--changes", required=True)
+    s.add_argument("--nul", action="store_true", help="changes are -z (NUL) separated")
+    s.add_argument("--profile", required=True,
+                   help="policy profile name (%s) or a JSON file issued by the launcher"
+                        % "|".join(sorted(PROFILES)))
+    r = sub.add_parser("validate-result"); r.add_argument("file")
+    ns = p.parse_args(argv)
+
+    try:
+        if ns.cmd == "canonicalize":
+            raw = _read(ns.file)
+            data = (canonical_json_bytes(strict_json_loads(raw)) if ns.kind == "json"
+                    else canonical_text_bytes(raw, strict=not ns.allow_hard_breaks))
+            if ns.emit == "bytes":
+                sys.stdout.buffer.write(data)
+            else:
+                print(sha256_hex(data))
+            return 0
+        if ns.cmd == "build-approval":
+            bundle, fp = build_approval(strict_json_loads(_read(ns.file)),
+                                        policy=_policy_arg(ns.policy))
+            print(json.dumps({"canonicalization": CANON_ALGO,
+                              "approval_bundle": bundle,
+                              "APPROVAL-FINGERPRINT": fp}, indent=2, sort_keys=True))
+            return 0
+        if ns.cmd == "verify-approval":
+            pol = _policy_arg(ns.policy)
+            bundle = strict_json_loads(_read(ns.bundle))
+            _, fp = build_approval(bundle, policy=pol)
+            return _report(verify_approval(strict_json_loads(_read(ns.record)),
+                                           bundle, policy=pol),
+                           "OK - approval record binds to %s..." % fp[:12])
+        if ns.cmd == "validate-scope":
+            manifest = strict_json_loads(_read(ns.manifest))
+            changes = parse_name_status(_read(ns.changes), nul=ns.nul)
+            prof = _policy_arg(ns.profile)
+            return _report(validate_scope(manifest, changes, profile=prof),
+                           "OK - %d changed path(s) within the approved scope" % len(changes))
+        if ns.cmd == "validate-result":
+            return _report(validate_result(strict_json_loads(_read(ns.file))),
+                           "OK - result satisfies the terminal contract")
+    except ContractViolation as e:
+        return _fail(str(e))
+    except ValueError as e:
+        return _fail(str(e))
+    except json.JSONDecodeError as e:
+        return _fail("unparseable JSON: %s" % e)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
