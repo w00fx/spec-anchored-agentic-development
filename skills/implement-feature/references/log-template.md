@@ -1,56 +1,19 @@
-# Log template — implement-feature runs
+# Run log template — supervised-local adapter
 
-The skill appends one log per run to
-`.claude/logs/implement-{ISO timestamp}.md`. Mirror this schema: one
-section per phase, fields filled as each phase completes — not
-reconstructed at the end.
+`.claude/logs/implement-feature-<timestamp>.md`. Fields follow the
+shared protocol (Phase 0–9); one log per run.
 
-```markdown
-# Implement run — [ISO timestamp]
-
-## Phase 1: Understand
-- Input: [user instruction summary]
-- Spec / issue read: [reference]
-- Target capability: [name]
-- Scenario: [capability / large feature / increment]
-- Files identified: [list]
-
-## Phase 1.5: Ambiguities
-- [Ambiguity → resolution]
-
-## Phase 2: Plan
-- Steps: [N]
-- Committed file scope: [list]
-
-## Phase 3: Implement
-- Scope changes: [none / list of approved expansions]
-- Replans: [none / delta summary of revised plan]
-- Files edited: [list]
-- Commits: [list of commit messages]
-
-## Phase 4: Test
-- Suite: [pass/fail counts]
-- Iterations: [N]
-
-## Phase 5: Review
-- PR: [link]
-- Report summary: [...]
-- Disputed findings: [none / finding → arbitration outcome]
-- Iterations: [N]
-
-## Phase 6: Close loop
-- Lessons: [...]
-- Spec: [updated yes/no — summary]
-- CLAUDE.md: [...]
-- Backlog: [...]
-
-## Phase 7: Done
-- Total iterations across QA: [N]
-- Human approval required: [yes/no — reason]
-```
-
-Field notes:
-- `Replans` — any Phase 3 → Phase 2 return: record the delta over the
-  approved plan, not the full new plan.
-- `Disputed findings` — review findings you contested, each with the
-  human's arbitration outcome.
+- run_id · issue/target · typed branch · mode: supervised-local
+- Phase 0 preflight: spec status + pinned commit check (SPEC_CURRENT/STALE)
+- Phase 1 proven delta: expected / observed / evidence (command + exit) / gap
+  — or NO_CHANGE_CANDIDATE (evidence target; classification) → Phase 8 review →
+  NO_CHANGE_REQUIRED only if corroborated
+- Phase 2 ambiguity: questions asked, answers (in-session)
+- Phase 3 plan: APPROVAL-FINGERPRINT, human approval noted
+- Phase 4 implement: chunks, declared-interface commands run
+- Phase 5 verify: per-criterion (ID → test → runner output ref)
+- Phase 6 durable sync: lessons/docs/proposals written
+- Phase 7 seal: base/head SHAs; re-seals if edited after
+- Phase 8 review: reviewer dispatched, findings, resolutions
+- Phase 9 terminal: PR_READY_AWAITING_HUMAN | NAMED_BLOCKER | NO_CHANGE_REQUIRED
+- Cost where visible
