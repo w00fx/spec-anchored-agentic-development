@@ -71,7 +71,7 @@ One state machine, three modes. `protocols/implementation-protocol.md` holds pha
 | `protocols/references/review-target-schema.md` | Review target and seal schemas — the candidate the reviewer judged is the candidate that ships. |
 | `skills/implement-feature/` | **Supervised-local** adapter — the human satisfies every gate in-session. |
 | `skills/implement-orchestrated/` | **Orchestrated-worker** adapter — one ticket, one worktree, one PR; gates satisfied through GitHub. |
-| `skills/implement-backlog/` | **Unattended** adapter — every gate has a mechanical provider or aborts as a named blocker. |
+| `skills/implement-backlog/` | **Unattended** adapter — every gate has a mechanical provider or aborts as a named blocker. Its `references/` carry the shared PR template and the rationalizations table. |
 
 ### The review lenses and the reviewer
 
