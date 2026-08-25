@@ -1,0 +1,43 @@
+# The single gate. Everything the bundle can prove about itself, on every
+# push and every PR — the same script a contributor runs locally, so a green
+# check here and a green run there mean the same thing.
+name: gate
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The structural validator parses frontmatter; the contracts kernel
+      # itself is dependency-free.
+      - name: Install the validator's one dependency
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Run the gate
+        run: bash scripts/check-all.sh
+
+      # Budgets are environment-specific: the script's defaults carry headroom
+      # over a developer machine, and CI's p95 is the number to calibrate from.
+      # Three consecutive green runs before tightening SA_BUDGET_* here.
+      - name: The tree the gate judged must be the tree it leaves
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "the gate mutated the working tree:"
+            git status --porcelain
+            exit 1
+          fi
