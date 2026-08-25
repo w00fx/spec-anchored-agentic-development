@@ -1,0 +1,33 @@
+{
+  "adapters": [
+    "implement-feature"
+  ],
+  "denied_path_patterns": [],
+  "execution_mode": "supervised",
+  "forbidden_path_patterns": [],
+  "golden_oracle": "human-only",
+  "governance": "deny",
+  "max_exact_paths": null,
+  "max_recursive_scope_patterns": null,
+  "max_scope_roots": null,
+  "metrics_baseline": "human-only",
+  "pattern_grammar": {
+    "forbid_intermediate_wildcard": false,
+    "forbid_leading_wildcard": false,
+    "forms": [
+      "exact",
+      "trailing-recursive",
+      "free"
+    ],
+    "minimum_literal_segments": 1
+  },
+  "permission_ceiling": {
+    "data_migration": true,
+    "dependency_change": true,
+    "external_side_effect": true,
+    "schema_change": true
+  },
+  "profile_id": "supervised-local/v1",
+  "requires_scope_roots": false,
+  "spec_semantics": "gated"
+}

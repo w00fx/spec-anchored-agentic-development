@@ -1,0 +1,19 @@
+{
+  "base_profile": "unattended/v1",
+  "overlay": {
+    "authorized_scope_roots": [
+      "src/payments",
+      "tests/payments"
+    ],
+    "max_scope_roots": 2,
+    "max_recursive_scope_patterns": 2,
+    "max_exact_paths": 10,
+    "denied_path_patterns": [
+      "src/payments/secrets/**"
+    ],
+    "allowed_operations": [
+      "M",
+      "A"
+    ]
+  }
+}
