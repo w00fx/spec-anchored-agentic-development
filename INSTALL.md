@@ -2,11 +2,33 @@
 
 This bundle turns a coding agent into the system described in `GUIDELINE.md`
 (English, canonical): capability-organized, spec-anchored development;
-implementation skills, a reviewer agent with criteria lenses, and direct adapter invocations (`/goal` is an optional, eval-gated composition — never the engine).
+one implementation protocol with three mode adapters, a reviewer agent with
+criteria lenses, an authorization floor, and executable contracts that refuse.
 
-Copy the `.claude/` folder into your repository root and the root-level
-documents wherever your team keeps them. Read `GUIDELINE.md` first;
-`AUTONOMY-PLAYBOOK.md` when you start widening autonomy.
+**The bundle folders live at this repository's top level; in your repository
+they go under `.claude/`.** From your repository root:
+
+```bash
+mkdir -p .claude
+cp -R <path-to-bundle>/{protocols,skills,commands,agents,rules,hooks,routines} .claude/
+cp -R <path-to-bundle>/{spec-templates,policy,scripts,tests} .
+cp <path-to-bundle>/{GUIDELINE.md,AUTONOMY-PLAYBOOK.md,EVALS.template.md} .
+```
+
+`spec-templates/`, `policy/`, `scripts/` and `tests/` stay at the top level:
+the template and the policy artifacts are read by humans and by CI, and the
+gate reserves `scripts/**` as a governance surface. A repository whose
+`scripts/` already holds product code installs the harness under
+`.spec-anchored/` instead — see `policy/README.md`.
+
+Two dependency notes. The structural validator needs `pyyaml`
+(`pip install pyyaml`); `scripts/spec-anchored` itself is dependency-free. And
+to invoke the contracts as `spec-anchored <cmd>`, the way the protocol writes
+them, put `scripts/` on your PATH or symlink the file — otherwise call
+`python3 scripts/spec-anchored <cmd>`.
+
+Read `GUIDELINE.md` first; `AUTONOMY-PLAYBOOK.md` when you start widening
+autonomy.
 
 ## Where each file goes
 
@@ -24,6 +46,7 @@ documents wherever your team keeps them. Read `GUIDELINE.md` first;
 | `.claude/skills/implement-feature/references/log-template.md` | Log schema for the skill's runs (read when opening the run log) |
 | `.claude/skills/implement-backlog/SKILL.md` | Unattended adapter (mechanical-or-abort gates; invoked directly — launcher's `claude -p` or routine child session; terminal = PR_READY_AWAITING_HUMAN, never merge-monitoring) |
 | `.claude/skills/implement-backlog/references/log-template.md` | Log schema for autonomous runs (read when opening the run log) |
+| `.claude/skills/implement-backlog/references/rationalizations.md` | The shortcuts that turn an unattended run into a discarded PR — read when the run is tempted to skip a gate |
 | `.claude/skills/implement-backlog/references/pr-template.md` | Shared PR description template, all adapters (Approved plan + fingerprint; terminal = PR_READY_AWAITING_HUMAN — monitoring lives outside the run) |
 | `scripts/check-all.sh` | **The single gate — CI runs this.** Compiles the contracts, runs the structural validator, the contract suite, the adversarial suite, and the Codex port drift check |
 | `scripts/spec-anchored` | **Executable contracts** (dependency-free, fail-closed): `canonicalize`, `build-approval` + `verify-approval` (APPROVAL-FINGERPRINT over the canonical bundle; the record proves the approval *event*), `validate-scope` (schema-valid manifest, absolute deny, typed truth grants, permissions, NUL-safe parser), `validate-result` (strict terminal union). `python3 scripts/spec-anchored <cmd>` |
@@ -32,12 +55,13 @@ documents wherever your team keeps them. Read `GUIDELINE.md` first;
 | `scripts/run-step.py` | Portable per-step timeout for the gate (exit 124), so the budget is real without depending on a `timeout(1)` binary |
 | `tests/_harness.py` | Test harness with **explicit outcome protocols** (`raises` / `violations` / `clean` / `value` / `holds`). `raises` demands the kernel's own `ContractViolation`: a crash of any other type is a programming failure, not a refusal |
 | `tests/test_kernel_contracts.py` | 61 fast in-process checks — canonicalization, the approval mutation matrix, scope under a policy floor, the terminal union |
-| `tests/test_kernel_adversarial.py` | 70 fast adversarial fixtures — every bypass audits nine through eleven found: denied-path-as-truth, oracle-inside-specs, permission evasion, self-authorization, governance-surface writes, cross-run and cross-repo approval replay, impossible calendar dates, padded diff paths, fake terminals |
-| `tests/test_corpus.py` | 16 slow corpus fixtures (retired forms, hidden files, broken CLI, broken shell, unterminated frontmatter) — run **once** by the gate, never per mutant |
-| `tests/test-mutants.py` | **Mutation adequacy** — injects 21 regressions into the kernel and requires a fixture to catch each, running only the fast suites. A survivor is named. The whole gate finishes in seconds |
+| `tests/test_kernel_adversarial.py` | 202 fast adversarial fixtures — every bypass audits nine through eleven found: denied-path-as-truth, oracle-inside-specs, permission evasion, self-authorization, governance-surface writes, cross-run and cross-repo approval replay, impossible calendar dates, padded diff paths, fake terminals |
+| `tests/test_corpus.py` | 45 slow corpus fixtures (retired forms, hidden files, broken CLI, broken shell, unterminated frontmatter) — run **once** by the gate, never per mutant |
+| `tests/test-mutants.py` | **Mutation adequacy** — injects 52 regressions into the kernel and requires a fixture to catch each, running only the fast suites. A survivor is named. The whole gate finishes in seconds |
 | `scripts/validate-bundle.py` | Structural gate ONLY (corpus scan including hidden dirs, frontmatter policy, retired forms, py_compile, `bash -n`). It never runs the suites — mixing those roles is what let an env var skip the tests |
-| `scripts/install-codex-port.sh` | Experimental Codex coexistence materializer — invoke as `bash scripts/install-codex-port.sh`; qualify before trusting (EVAL-014/015) |
+| `scripts/install-codex-port.sh` | Experimental Codex coexistence materializer — invoke as `bash scripts/install-codex-port.sh`; qualify before trusting (EVAL-018) |
 | `EVALS.template.md` | Eval-case schema + the 21-case initial index (deduplicated); copy to `EVALS.md` when qualifying |
+| `.claude/protocols/references/scope-manifest-schema.md` | The run's mechanical-scope proposal (allowed/denied paths, permissions, typed truth grants) — a subset of the policy floor, hashed into the approval bundle |
 | `.claude/protocols/references/review-target-schema.md` | Seal schemas (review target + report + invalidation check) — staged enforcement |
 | `.claude/protocols/implementation-protocol.md` | The shared implementation state machine — phases, terminals, gates; every implement skill is a mode adapter over it |
 | `.claude/skills/implement-orchestrated/SKILL.md` | Orchestrated-worker adapter: first-message invocation, GitHub-satisfied gates, plan fingerprint, self-checks, parked delivery |

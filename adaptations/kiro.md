@@ -69,8 +69,10 @@ agent's mother tongue.
    supervised path ports well; the autonomous path ports with weaker
    guarantees.
 2. **The model re-audit fires in full.** Every prompt artifact here is
-   tuned for Claude Opus 4.8; Kiro runs Bedrock FMs, and the levers
-   (ULTRATHINK, plan-mode substitutes, `/advisor`) don't exist there.
+   tuned for Claude Opus 4.8; Kiro runs Bedrock FMs, and the harness
+   levers this system leans on (ULTRATHINK, plan-mode substitutes,
+   Claude Code's `/advisor` — none of them bundle artifacts) don't
+   exist there.
    The skills' own doctrine applies: on a model change, re-audit —
    this is the adaptation's largest real cost.
 3. **Evidence becomes discipline, not mechanism.** Trace hooks can
