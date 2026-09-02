@@ -7,3 +7,6 @@
 # Python/tool caches
 __pycache__/
 *.pyc
+
+# macOS
+.DS_Store
