@@ -1,12 +1,12 @@
 # Spec-Anchored Agentic Development
 
-> One permanent spec per capability, and the code answers to it —
-> evidence before "done". A guideline for building software with AI
-> agents, from a single spec file to supervised autonomy.
+> One durable logical capability contract with a stable entrypoint, and the
+> code answers to it — evidence before "done". A guideline for building
+> software with AI agents, from a minimal contract to supervised autonomy.
 
 Permanent reference.
 
-> This document is the **doctrine**: concepts, responsibilities, policies. The executable state machine is `.claude/protocols/implementation-protocol.md` — phases 0–9, terminals, gates — and the three mode adapters (`implement-feature` supervised, `implement-orchestrated` worker, `implement-backlog` unattended) declare who satisfies each gate. **On any conflict about execution, the protocol wins**; on any conflict about intent, this document wins — and either conflict is a bug to fix, never a silent exception.
+> This document is the **doctrine**: concepts, responsibilities, policies. The executable state machine is `.agents/protocols/implementation-protocol.md` — phases 0–10, terminals, gates — and the three mode adapters (`implement-feature` supervised, `implement-orchestrated` worker, `implement-backlog` unattended) declare who satisfies each gate. **On any conflict about execution, the protocol wins**; on any conflict about intent, this document wins — and either conflict is a bug to fix, never a silent exception.
 
 > **Companion documents**: `AUTONOMY-PLAYBOOK.md` covers the widening path of autonomy (the four Milestones, Tier 1/2 validation, per-class auto-merge). `EVALS.md` is your project's eval-suite artifact — required to *widen* autonomy, not to start it narrow (Part 5).
 
@@ -20,13 +20,13 @@ Five principles that govern everything here. When in doubt, return to them.
 2. **Root cause, not band-aid.** If a bug shows up, find out why — don't hide the symptom. No temporary fixes that become permanent.
 3. **Verification is part of the work, not optional.** Every change needs a way to verify it (test, expected output, observable behavior). If you can't verify it, don't merge it.
 4. **Determinism where you can, agent where you must.** Every predictable task (file management, indexing, appending to logs/lessons, path lookups, manipulating issue/PR metadata) should become a deterministic script the agent calls — not the agent's work. The agent is expensive, non-deterministic, and burns context. A script is cheap, deterministic, and auditable. If you're asking the agent for something a shell or TS could do on its own, move it to a script.
-5. **Machine-produced "no" before human review.** The machine produces the first "no," not the human. Every gate the machine can run — a failing test, a type error, a lint rule, a reviewer's objection — must fire before a human is asked to look. This is *backpressure*: the check refuses the agent's work at the boundary, so the agent confronts expectations before a human does. Where a human is reduced to a clipboard relaying machine feedback back to the agent, backpressure is missing — build the check instead.
+5. **Machine-produced "no" before human review.** The machine produces the first "no," not the human. Every gate the machine can run — a failing test, a type error, a lint rule, an internal hardening failure or external reviewer objection — must fire before a human is asked to look. This is *backpressure*: the check refuses the agent's work at the boundary, so the agent confronts expectations before a human does. Where a human is reduced to a clipboard relaying machine feedback back to the agent, backpressure is missing — build the check instead.
 
 ---
 
 ## How to read this document
 
-This guideline assumes **spec-anchored development organized by capability**. You identify the **capabilities** the system delivers, write a spec for each (business intent, rules, acceptance criteria), develop from the specs, and progress in autonomy. **Spec-anchored**: the business decision comes before the code — and the spec *stays*. It is the permanent source of truth the code answers to (drift is a bug; conformance is checked value by value), not scaffolding discarded once the feature ships. The full trajectory:
+This guideline assumes **spec-anchored development organized by capability**. You identify the **capabilities** the system delivers, establish one durable logical contract and stable entrypoint for each (business intent, rules, acceptance criteria), develop from the specs, and progress in autonomy. **Spec-anchored**: the business decision comes before the code — and the spec *stays*. It is the permanent source of truth the code answers to (drift is a bug; conformance is checked value by value), not scaffolding discarded once the feature ships. The full trajectory:
 
 ```
 Identify capabilities → Specification → Development
@@ -36,13 +36,13 @@ Identify capabilities → Specification → Development
 
 A **capability** is a cohesive slice of what the system *does* for the business — payments, orders, notifications, billing. Not a technical layer (controller, repository), not an isolated entity (Product, Customer), not a mechanism (cache, queue). It is naturally bounded, which is why specs are written around it. (When a capability has a clear linguistic boundary — the same word means different things on each side — its relation to what some methodologies call a *bounded context* is **mapped, not presumed** — a capability can span contexts, a context can host several capabilities; the vocabulary is optional, and you don't need it to recognize that payments ≠ orders.)
 
-**Where this sits in the field.** A taxonomy is consolidating (arXiv's "Spec-Driven Development: From Code to Contract", 2026; echoed in the martinfowler.com *exploring-gen-ai* series) with three levels of rigor inside spec-driven development: **spec-first** — the spec precedes the code but may drift or be discarded afterwards; **spec-anchored** — the spec is permanent and the code answers to it continuously; **spec-as-source** — code is generated or derived from the spec. Kiro and Spec Kit default to spec-first per-feature flows, though both document living-spec / continuous-refinement modes; the difference here is not "they discard, we keep" but that this system **hardens** the living-spec end — permanent per-capability authority, ratification, stable IDs, conformance gates. This guideline is **spec-anchored by construction** — one permanent spec per capability, drift treated as a bug, conformance checked value by value — and, for normative rules, moves toward as-source: the spec's reference values generate the golden tests that act as the oracle. An adaptation map for running this system on Kiro — the translation table, the execution-layer mapping, and the three limitations — ships in the bundle (`adaptations/` — `kiro.md`; `codex.md` for the harness-class peer; `claude-plus-codex.md` for running both on one repo).
+**Where this sits in the field.** A taxonomy is consolidating (arXiv's "Spec-Driven Development: From Code to Contract", 2026; echoed in the martinfowler.com *exploring-gen-ai* series) with three levels of rigor inside spec-driven development: **spec-first** — the spec precedes the code but may drift or be discarded afterwards; **spec-anchored** — the spec is permanent and the code answers to it continuously; **spec-as-source** — code is generated or derived from the spec. Kiro and Spec Kit default to spec-first per-feature flows, though both document living-spec / continuous-refinement modes; the difference here is not "they discard, we keep" but that this system **hardens** the living-spec end — permanent per-capability authority, ratification, stable IDs, conformance gates. This guideline is **spec-anchored by construction** — one durable logical authority and stable entrypoint per capability, drift treated as a bug, conformance checked value by value — and, for normative rules, moves toward as-source: the spec's reference values generate the golden tests that act as the oracle. An adaptation map for running this system on Kiro — the translation table, the execution-layer mapping, and the three limitations — ships in the bundle (`adaptations/` — `kiro.md`; `codex.md` for the harness-class peer; `claude-plus-codex.md` for running both on one repo).
 
 The document structure mirrors the trajectory:
 
 - **Part 1** — Project start: identifying capabilities, the spec before the code. From capability boundaries to development.
 - **Part 2** — Layer 1: Permanent knowledge (operation). Context files, constitution, rules, skills.
-- **Part 3** — Layer 2: Active work (operation). Specs and slash commands.
+- **Part 3** — Layer 2: Active work (operation). Specs and explicit workflow skills.
 - **Part 4** — Layer 3: Backlog and operation. Issues, workflow, routine.
 - **Part 5** — Autonomy trajectory. Architecture vs increment split, the basic autonomous loop (narrow start: allowlist, green CI, human on every PR), and the widening rule — the detailed Milestones live in `AUTONOMY-PLAYBOOK.md`.
 - **Part 6** — Continuous vigilance. Anti-patterns, warning signs, quarterly checks.
@@ -50,26 +50,30 @@ The document structure mirrors the trajectory:
 
 **Start simple, scale when evidence forces it.** You don't need a heavyweight modeling ceremony to start. Most of the time you already know where the capabilities are (payments ≠ orders ≠ notifications) — if the code already has seams (packages, services, feature folders), scope the specs on them. When a boundary is *not* obvious, mine evidence (git co-change, dependency clustering) rather than guessing. The tools exist to scale into harder cases, not to gate the easy ones. The target is **boundaries with high cohesion and low coupling** — an engineering principle, independent of any single methodology.
 
-**The minimum entry point (small projects).** The floor is **one spec file**. You do not need the constitution, the reviewer, the milestones, or the rituals to begin — write a single `specs/<capability>/<capability>.md` for the capability you're about to build, and start. Everything else in this document is how the system *scales*, and each piece enters when its pain shows up, in the order Part 7 gives. Start small — but start with a spec.
+**The minimum entry point (small projects).** The floor is one stable capability entrypoint, commonly a single `specs/<capability>/<capability>.md` file at first. You do not need the constitution, hardening agents, milestones, or rituals to begin. As the contract grows, that entrypoint may declare a multi-file logical corpus (`rules.md`, `acceptance.md`, `contracts/`, tables, state models) without creating a second authority. Everything else in this document is how the system scales. Start small — but start with a durable contract.
 
-**Evolution principle**: capability boundaries are decided upfront enough to scope the first specs — this doesn't emerge from vibe coding, it comes from deliberate (but lightweight) judgment. What evolves is the **tactical detail** (rules, edge cases) and the **operational machinery** (extensive rules, routines, autonomy), as implementation reveals insight and pain justifies investment. **The model doesn't decide the structure — the human decides, in discussion with Claude, and refines as they learn.** Templates and structures in this document are **examples of common patterns**, not mandatory recipes. If your system has no pipeline, no layered capabilities, no sub-areas — that's fine, adapt. What matters is the principle (separation by business responsibility, explicit contracts, versioned rules), not the topology.
+**Evolution principle:** capability boundaries are decided upfront enough to scope the first contracts. This does not emerge from vibe coding; it comes from deliberate, lightweight judgment. What evolves is the tactical detail (rules, edge cases) and the operational machinery (rules, hardening, launchers, autonomy), as implementation reveals insight and pain justifies investment. **The model does not decide the structure — the accountable human decides, in discussion with the active agent, and refines as evidence accumulates.** Templates and structures here are examples, not mandatory recipes. What matters is separation by business responsibility, explicit contracts, and versioned rules — not a prescribed topology.
 
-**Brownfield adaptation**: same approach, applied to existing code — intended and real boundaries diverge, so map the live code (implicit capability seams, de facto contracts, scattered domain rules) by mining co-change and dependency structure, propose the boundaries in discussion with Claude, and then apply specification and development over that reorganization.
+**Brownfield adaptation:** apply the same approach to existing code. Intended and real boundaries diverge, so map the live system using language, ownership, transactions, co-change, and dependency evidence; discuss candidate boundaries with the active agent; then apply specification and development over the approved reorganization.
 
-**Two layers, different portability.** This guideline has two layers, and they travel differently across tools:
+**Shared core, runtime-specific adapters.** The durable contract and implementation machinery are cross-harness by default:
 
-- **Specs and context (Parts 1-2)** — capabilities, specs, the `AGENTS.md`/`CLAUDE.md` files, the constitution. This layer is **tool-portable**: any coding agent (Claude Code, Codex, Kiro, OpenCode, Cursor) reads the same specs and context files.
-- **Automation (Parts 3-5)** — the shared implementation protocol and its three mode adapters, the decorrelated reviewer, the launchers, the autonomy trajectory. This layer is **implemented in Claude Code**; the concepts are general, the mechanism is Claude Code's. In another tool, map each piece to its equivalent.
+- **Shared authority and context (Parts 1–2)** — capability contracts, architecture, root and capability `AGENTS.md`, and canonical engineering rules under `.agents/rules/`.
+- **Shared workflows (Parts 3–5)** — skills under `.agents/skills/`, the state machine under `.agents/protocols/`, paired agent contracts under `agents/`, run artifacts under `.agent-runs/<run-id>/`, and external review artifacts bound to exact candidate identity.
+- **Runtime-specific adapters** — only the launcher/configuration surfaces required by a harness, such as `.codex/agents/`, optional `.cursor/agents/`, or Claude-specific hooks/routines under `.claude/`.
 
-The pieces of the automation layer, in plain terms:
+The pieces, in plain terms:
 
-- **skill** — an agent with a procedure: a workflow the model runs end to end (plan → implement → test → review).
-- **`AGENTS.md`/`CLAUDE.md`** — the rules and conventions the agent loads (see the note in Part 2).
-- **The launcher** — whatever starts a run and validates its structured terminal from outside the transcript (a person typing the invocation, a GitHub Action, a Routine). (`/goal`, Claude Code's session-scoped completion re-check, is an optional composition on top of a run — Part 3; never the engine and never a loader.)
-- **reviewer** — a separate agent that checks the work and reports findings; it never writes.
-- **`.claude/rules/`** — invariant rules loaded every session.
+- **skill** — an explicit workflow with ordering, gates, artifacts, and terminals;
+- **`AGENTS.md`** — the cross-harness routing layer and concise operational floor;
+- **`.agents/rules/`** — canonical engineering instructions, loaded explicitly according to `AGENTS.md` and the active workflow;
+- **protocol** — the shared state machine and artifact contracts under `.agents/protocols/`;
+- **launcher** — whatever starts a run and validates its structured terminal outside the transcript;
+- **internal hardening agents** — isolated authoring agents that improve the candidate and return exact commits/reports for Owner inspection;
+- **external reviewers** — report-only systems outside the implementation worker, bound to the final candidate;
+- **`.agent-runs/<run-id>/`** — gitignored runtime state, logs, approvals, evidence, handoffs, dispositions, and result.
 
-In another tool, the launcher becomes that tool's automation primitive, skills become its agent/workflow definitions, and `.claude/rules/` becomes its always-loaded rules file. The specs and `AGENTS.md`/`CLAUDE.md` don't change.
+The shared artifacts do not move when the harness changes. Only adapters and launch syntax do.
 
 ---
 
@@ -126,7 +130,7 @@ The spec captures the known business source of truth: domain rules, edge cases, 
 From the specs, implementation via skills (`implement-feature` — see Part 3).
 
 - Each capability is implemented from its spec.
-- A large feature within an existing capability starts as a spec delta (`/shape` against the existing spec) merged at the gate before any code — any new business rule it introduces lands in the capability spec (permanent) as PR 1; `/spec-to-tickets` then breaks it into frontier slices, each carried by its own normal-sized plan (protocol Phase 3).
+- A large feature within an existing capability starts as a spec delta (`shape` against the existing spec) merged at the gate before any code — any new business rule it introduces lands in the capability spec (permanent) as PR 1; `spec-to-tickets` then breaks it into frontier slices, each carried by its own normal-sized plan (protocol Phase 3).
 - Implementation is incremental: one capability at a time, by priority. The map from Stage 0 covers the boundaries you could already justify; the ambiguous middle splits when evidence forces it, and construction is phased either way.
 - Refinement of capability boundaries/spec as insight emerges, always with the `requires_human_approval` flag — because a change in a boundary or domain rule is a business change, and business needs a human eye.
 
@@ -141,13 +145,13 @@ A dimension orthogonal to the stages above. Even spec-anchored, a freshly starte
 - Coverage threshold per capability (not global)
 - Green build as a merge prerequisite
 
-Deeper code evaluations (complexity, duplication, dependency structure, mutation testing, security checks) enter gradually as autonomy widens (Tier 1 — see `AUTONOMY-PLAYBOOK.md`); they are not a prerequisite for the operational base. **Adopt gates as ratchets where brownfield resists:** ban new violations, grandfather the existing count, and make the count only allowed to shrink — a gate that demands instant purity gets bypassed within a month, and then you've got drift *plus* ceremony; a ratchet gets obeyed (source #37). Mutation testing deserves its purpose named: it is the **deterministic hollow-test detector** — mutate the code, and a suite that stays green is hollow; it tests the tests by machine, promoting the reviewer's inferential hollow-test ban to mechanism. Run it **coverage-guided** (mutate only covered operators — uncovered code's mutants survive trivially), diff-scoped on PRs or scheduled on the calculation core (never full-suite per commit), and adopt it through the ratchet: the score only moves up (Stryker for TS, go-mutesting for Go — source #45).
+Deeper code evaluations include complexity, duplication, dependency structure, mutation testing, property/fuzz testing, and security checks. Mutation testing is the deterministic hollow-test detector: deliberately violate the code and require the relevant evidence to fail. For every repository-declared eligible mutation target, the internal Hardener requires 100% line coverage, 100% branch coverage, 100% mutant resolution, and zero actionable survivors. Brownfield scope is controlled by target eligibility—not by lowering the target's bar: start with changed and critical logic, then widen coverage over time; full-codebase mutation may remain scheduled or release-gated. Tools, versions, targets, and budgets are repository rulings, not improvised per run.
 
 After minimum CI, the **autonomy trajectory** (Part 5) starts narrow and widens over the stable base — the widening criteria live in `AUTONOMY-PLAYBOOK.md`. From Part 2 onward, all content in the guideline assumes this operational base.
 
 ### The errors that kill a project
 
-**Starting to code without identifying capabilities.** Skipping boundary identification and going straight to code produces exactly what you want to avoid: disorganized structure, capabilities that blur together, a system impossible to stabilize later. By week 8 it's 30k lines, nobody knows where anything is, and changes break three things. Symptom: you or Claude asks "where does X go?" and there's no clear answer. This does not require any heavyweight method — it requires knowing your capabilities and their seams, which for most projects you already do.
+**Starting to code without identifying capabilities.** Skipping boundary identification and going straight to code produces exactly what you want to avoid: disorganized structure, capabilities that blur together, a system impossible to stabilize later. By week 8 it's 30k lines, nobody knows where anything is, and changes break three things. Symptom: you or the active agent asks "where does X go?" and there's no clear answer. This does not require any heavyweight method — it requires knowing your capabilities and their seams, which for most projects you already do.
 
 **Over-detailing before implementing.** The opposite error: trying to specify every rule, every edge case on paper before writing a line. Capability boundaries often only sharpen during implementation. Complete tactical specs upfront become debt before any code runs. Symptom: editing spec more than code in the first weeks.
 
@@ -157,143 +161,79 @@ The balance: **boundary identification upfront (lightweight), tactical detail em
 
 ## Part 2 — Layer 1: Permanent knowledge
 
-**Language convention:** all agent-facing artifacts — the operational context file (`AGENTS.md`/`CLAUDE.md`, see the note in this Part), specs, `.claude/rules/`, skills — are written in English, regardless of the team's language. This published scaffolding uses English as its canonical artifact language for cross-harness portability; a repository may declare another canonical language. Domain terms remain verbatim and authoritative in the capability language, and any language-policy change should be evaluated against representative tasks. Discussion and planning can happen in the team's language; the versioned artifacts the agent reads are in English.
+**Language convention:** all agent-facing artifacts — `AGENTS.md`, specs, `.agents/rules/`, `.agents/skills/`, `.agents/protocols/`, and internal-agent contracts — are written in English, regardless of the team's language. This published scaffolding uses English as its canonical artifact language for cross-harness portability; a repository may declare another canonical language. Domain terms remain verbatim and authoritative in the capability language, and any language-policy change should be evaluated against representative tasks. Discussion and planning can happen in the team's language; the versioned artifacts the agent reads are in English.
 
 Context engineering operates in three layers. Mixing them is the biggest source of problems.
 
-**Layer 1 — Permanent knowledge** (this part): conventions, domain rules, architectural decisions, glossary, contracts between stages. Lives in versioned files (`AGENTS.md/CLAUDE.md`, `.claude/rules/`, `docs/`, `specs/`, `architecture/`). Changes rarely; each change requires a conscious commit.
+**Layer 1 — Permanent knowledge** (this part): conventions, domain rules, architectural decisions, glossary, contracts, root/capability `AGENTS.md`, `.agents/rules/`, `docs/`, `specs/`, and `architecture/`. Changes rarely; each change requires a conscious commit.
 
-**Layer 2 — Active work** (Part 3): implementation plan, research notes, decisions specific to the feature being built. Lives in Claude Code's Tasks system or ad-hoc files per feature. High change during the feature, disposable afterward.
+**Layer 2 — Active run state** (Part 3): proven delta, assumptions, approved plan/scope, evidence, hardening targets and handoffs, Owner dispositions, logs, final candidate, and result. It lives under the gitignored `.agent-runs/<run-id>/`; sanitized copies may be retained as CI artifacts. This state is operational evidence, not permanent repository authority.
 
-**Layer 3 — Intent and prioritization** (Part 4): what needs to be done, in what order, why. Lives in GitHub Issues with labels.
+**Layer 3 — Intent and prioritization** (Part 4): what needs to be done, in what order, and why. It lives in GitHub Issues with explicit dependencies and outcomes.
 
 **Flow rule between layers:** when something learned in Layer 2 deserves to survive, it moves up to Layer 1. When something in Layer 1 is obsolete, update or remove it.
 
 ### Folder structure
 
-Two fixed principles, **independent of project type** (data pipeline, API backend, web frontend, monorepo):
+Two fixed principles, independent of project type:
 
-1. **`docs/` and `specs/` are centralized** — domain source of truth in one place, easy to navigate and version.
-2. **Code is organized by capability (or functional area), and each one has its AGENTS.md/CLAUDE.md next to the code** — because AGENTS.md/CLAUDE.md is loaded by proximity to the file being edited. A AGENTS.md/CLAUDE.md far from the code isn't auto-loaded; it needs to be in the folder hierarchy of the code it describes.
+1. `docs/` and `specs/` are centralized sources of durable domain truth.
+2. Code is organized by capability; scoped `AGENTS.md` files live next to code only when additional operational context is useful. Runtime loaders differ, so workflows explicitly read the target capability file when its presence in the effective instruction chain is not proven.
 
 ```
 project/
-├── AGENTS.md/CLAUDE.md                          ← entry point, ~60 lines (English)
-├── GUIDELINE.md                       ← this meta-doc (you read it; the agent doesn't)
-├── EVALS.md                           ← eval infrastructure (required to widen autonomy)
+├── AGENTS.md                         ← cross-harness routing and operational floor
+├── GUIDELINE.md                      ← doctrine
+├── EVALS.md                          ← qualification and regression-eval artifact
+├── .gitignore                        ← includes .agent-runs/
 │
 ├── architecture/
-│   ├── constitution.md                ← non-negotiable principles · read by constitution-compliance-review
-│   ├── pipeline.md                    ← contracts between capabilities
-│   └── decisions/                     ← ADRs (dated decisions)
+│   ├── constitution.md               ← non-negotiable principles
+│   ├── pipeline.md                   ← contracts between capabilities
+│   └── decisions/                    ← ADRs
 │
-├── .claude/
-│   ├── rules/                         ← auto-loaded every session
-│   │   ├── package-by-feature.md
-│   │   └── truth-layer.md
-│   ├── lessons.md                     ← accumulated pitfalls (skills append in Phase 6)
-│   ├── logs/                          ← structured per-run logs (auditability)
-│   ├── commands/                      ← entry points (slash commands)
-│   │   ├── implement.md               ← local entry point → implement-feature (gates, no /goal)
-│   │   ├── review.md                  ← on-demand reviewer entry point (report-only)
-│   │   ├── explain.md                 ← post-implementation walkthrough of the changes (reference + audit)
-│   │   ├── plan-from-issue.md
-│   │   ├── shape.md
-│   │   ├── to-spec.md
-│   │   ├── prep.md
-│   │   ├── orchestrate.md
-│   │   ├── spec-to-tickets.md
-│   │   └── review-spec-drift.md
-│   ├── protocols/
-│   │   ├── implementation-protocol.md ← THE shared state machine (phases 0–9, terminals)
-│   │   └── references/                ← scope manifest + review target/seal schemas
-│   ├── agents/
-│   │   └── reviewer.md                ← fresh-context router (doesn't write; routes; reports)
-│   └── skills/
-│       ├── implement-feature/         ← supervised-local adapter (protocol 0–9; in-session gates)
-│       ├── implement-orchestrated/    ← orchestrated-worker adapter (gates via GitHub)
-│       ├── implement-backlog/         ← unattended adapter (mechanical-or-abort; invoked directly)
-│       ├── plan-review/               ← review criteria: plan approach
-│       ├── general-code-review/       ← review criteria: correctness/simplicity/tests/types
-│       ├── constitution-compliance-review/   ← domain criteria: Decimal, audit, source, stages
-│       ├── conformance-review/        ← domain criteria: diff vs spec + diff vs plan
-│       └── ticket-readiness-review/   ← ticket as contract for a non-assisted worker
+├── agents/                           ← canonical paired internal-agent contracts
+│   ├── general-code-reviewer.md
+│   ├── general-code-reviewer.toml
+│   ├── mutation-hardener.md
+│   └── mutation-hardener.toml
 │
-├── .github/
-│   └── workflows/
-│       └── auto-implement.yml         ← launcher: claude -p "/implement-backlog issue #N" on label; terminal validated outside the transcript (skeleton)
+├── .agents/
+│   ├── skills/                       ← canonical cross-harness workflows
+│   ├── protocols/                    ← shared state machine and artifact contracts
+│   └── rules/                        ← canonical engineering rules, explicitly loaded
 │
-├── docs/                              ← CENTRALIZED
-│   ├── <domain-glossary>.md
-│   ├── <norm-reference>.md
-│   └── walkthroughs/                  ← /explain output: one walkthrough per implemented feature
+├── .agent-runs/                      ← runtime-only, gitignored; never packaged
+│   └── <run-id>/                     ← state, log, evidence, handoffs, dispositions, result
 │
-├── spec-templates/
-│   └── capability-spec.md             ← the spec template (permanent; one per capability)
+├── .codex/                           ← optional generated/runtime-specific adapter
+│   └── agents/
+├── .cursor/                          ← optional Cursor-specific adapter/configuration
+├── .claude/                          ← optional Claude-only hooks/routines
+│   ├── hooks/
+│   └── routines/
 │
-├── specs/                             ← CENTRALIZED (domain source of truth) · read by conformance-review
-│   ├── <capability-1>/                   ← mirrors src/<capability-1>/
-│   │   ├── <capability-1>.md             ← the spec
-│   │   └── contracts/
-│   └── <capability-2>/
-│       └── <capability-2>.md
+├── docs/                             ← glossary and reference material
+├── specs/                            ← logical capability contracts
+│   ├── _template/capability-spec.md
+│   └── <capability>/
+│       ├── <capability>.md           ← stable entrypoint and corpus map
+│       ├── contracts/
+│       └── <optional companion files>
 │
-└── src/                               ← CODE, organized by capability
-    ├── <capability-1>/
-    │   ├── AGENTS.md/CLAUDE.md                  ← points to specs/<capability-1>/
-    │   └── <code>
-    └── <capability-2>/
-        ├── AGENTS.md/CLAUDE.md                  ← points to specs/<capability-2>/
+└── src/                              ← code organized by capability
+    └── <capability>/
+        ├── AGENTS.md                 ← scoped context and contract pointer
         └── <code>
 ```
 
-`src/` is a generic name — use what your stack uses (`src/`, `app/`, `lib/`, `packages/`). What matters: code grouped by capability, AGENTS.md/CLAUDE.md in each, `specs/` centralized mirroring the same names.
+`src/` is generic; use `app/`, `lib/`, `packages/`, or the layout your stack expects. The invariant is capability-oriented code, a stable contract entrypoint, and explicit context routing.
 
-**Topology varies by project type — the principle doesn't.** The "unit of organization" changes depending on what you're building, but the pattern (code per context + co-located AGENTS.md/CLAUDE.md pointing to spec + centralized mirrored specs/) is universal:
-
-- **Data pipeline / regulated system:** domain capability in stages (ingest → parse → analyze → output). May have sub-areas inside complex stages.
-- **Services backend:** domain capability (orders, payments, users), not necessarily sequential.
-- **Web frontend:** functional area / product feature (checkout, dashboard, auth). Each area groups pages, components, state. The spec captures UI flows, states, UX rules, and which backend endpoints it consumes.
-- **Monorepo (front + back):** combines both — central `specs/` with `backend/` and `frontend/` inside, each app organized by its own unit.
-
-Web monorepo example:
-
-```
-monorepo/
-├── AGENTS.md/CLAUDE.md
-├── docs/                              ← centralized
-├── specs/                             ← centralized
-│   ├── backend/
-│   │   └── <capability>/
-│   │       └── <spec>.md
-│   └── frontend/
-│       └── <functional-area>/        ← e.g. checkout, dashboard, auth
-│           └── <spec>.md
-│
-└── apps/                              (or packages/)
-    ├── backend/
-    │   ├── AGENTS.md/CLAUDE.md                  ← backend app context
-    │   └── src/
-    │       └── <capability>/
-    │           ├── AGENTS.md/CLAUDE.md          ← points to specs/backend/<capability>/
-    │           └── <code>
-    └── frontend/
-        ├── AGENTS.md/CLAUDE.md                  ← frontend app context
-        └── src/  (or app/)
-            └── <functional-area>/
-                ├── AGENTS.md/CLAUDE.md          ← points to specs/frontend/<area>/
-                └── <pages, components>
-```
-
-In any topology the rule is the same: **`specs/` and `docs/` centralized; AGENTS.md/CLAUDE.md per capability next to the code, pointing to that capability's spec.** Sequential, parallel, graph, front+back — that's detail that emerges from the problem.
-
-**Staged pipeline is ONE pattern, not an obligation.** The first example shows 4 sequential stages because it's common in data processing, ETL, regulated systems. But your system could be a monolith with non-sequential capabilities, event-driven, hub-and-spoke, domain services coordinated by an orchestrator, or something that fits no category. What matters is the principle (separation by domain responsibility, explicit contracts with neighbors, versioned rules), not the topology.
-
-And on incrementality: **the capability map (capabilities and their relationships) is drawn in Stage 0 — but implementation is phased.** You don't build all capabilities at once. Start with the highest-value one or the one that unblocks dependencies; the others enter by priority. The difference from organic discovery: the boundaries you can justify are drawn deliberately up front instead of discovered by accident — the ambiguous middle starts together and splits when evidence forces it (Stage 0) — and construction is incremental either way.
+Topology may be sequential, service-oriented, event-driven, monolithic, frontend, or multi-repository. The principle is unchanged: centralized durable truth, capability ownership, explicit contracts, and workflows that can resolve the relevant corpus in the environment where they run.
 
 ### Where specs live, by topology
 
-The unit never changes — **one spec per capability, in any topology** (microservices, modular monolith, serverless). What deployment topology changes is *where* specs live, *how many deployables* implement one spec, and *how much weight* the Contracts section carries. The property every arrangement must preserve: **any agent implementing against a spec must be able to read it, at a stable path, in the environment where it works.** Repo boundaries break proximity loading; the arrangements below restore it, in order of escalation:
+The unit never changes — **one logical capability authority with a stable entrypoint, in any topology**. The corpus may begin as one file and later include declared companion files. Deployment topology changes where that corpus lives, how many deployables implement it, and how much weight the Contracts section carries. Every implementing agent must be able to resolve the authoritative corpus at an immutable revision in its working environment. Repository boundaries break local proximity; the arrangements below restore access, in order of escalation:
 
 1. **Capability contained in one repo** (the healthy microservice case, and every modular monolith): the spec lives in that repo. Nothing new — `specs/` per repo.
 2. **Capability spans a few repos** (`payment-api` + `payment-worker` + `payment-reconciler` = one capability, three deployables): the spec lives in the **owner repo** — the service that owns the write path / the data the rules govern. Each other repo's root context file carries three things: this service's role in the capability (2-3 sentences), the canonical pointer to the spec (repo + path + how to fetch it), and where the local contracts are. If "who owns it" is ambiguous, that's the signal for the next step.
@@ -301,7 +241,7 @@ The unit never changes — **one spec per capability, in any topology** (microse
 
 **The spec can be remote-with-pointer or vendored; contracts must be local.** The schema a service consumes/produces is what its code compiles against and its contract tests run against — vendored schemas or generated packages from the owner, never "see the other team's repo."
 
-**When one capability spans deployables, its spec gains a responsibility map**: which deployable owns which slice (api receives and validates; worker processes; reconciler verifies), and the contracts *between them*. Same pattern as `pipeline.md`, one level down — `pipeline.md` declares contracts between capabilities; this map declares contracts between one capability's deployables. It is what gives `conformance-review` something to check when a diff in the worker implements behavior the map assigns to the api.
+**When one capability spans deployables, its spec gains a responsibility map**: which deployable owns which slice (api receives and validates; worker processes; reconciler verifies), and the contracts *between them*. Same pattern as `pipeline.md`, one level down — `pipeline.md` declares contracts between capabilities; this map declares contracts between one capability's deployables. It is what gives external conformance review an explicit responsibility contract when a worker diff crosses deployables.
 
 Two things multi-repo gives you for free: `requires_human_approval` on spec changes stops being convention and becomes **mechanical permission** (branch protection + CODEOWNERS on the specs repo or path) — a large feature's new rule lands as PR 1 on the spec, human-gated by the platform, and PRs 2..N implement it, each repo recording which spec version it implements. And for work that crosses services, a **workspace** (the relevant clones side by side, one workspace context file on top) restores the proximity a repo boundary broke.
 
@@ -309,119 +249,81 @@ Be honest about the cost: these mechanisms *manage* multi-repo coordination — 
 
 ### Context discipline (what to write, what to leave out)
 
-Two failure modes when a spec or context file gets "too big" — different fixes:
+Golden rules for operational context:
 
-1. **Maintenance size** — the document got too big for a human to keep coherent. → fix with **decomposition by boundary** (split by capability).
-2. **Context size** — it doesn't fit the agent's window, or fills it with noise and degrades attention *before* the hard limit. → fix with **scoped loading / retrieval** (nested context files, load only the region in play).
+- Document only what the agent cannot safely infer from code, types, scripts, or standard tooling.
+- Keep code organized by capability so the structure itself communicates ownership.
+- Prefer binary, testable obligations over vague advice.
+- Treat stale context as a defect; review it like code.
+- Keep durable truth in specs/architecture, reusable engineering obligations in `.agents/rules/`, procedures in `.agents/skills/`, and runtime state in `.agent-runs/`.
 
-> **Boundary symptom, not tooling.** If editing capability A's spec forces editing capability B's, the problem is **coupling** — the boundary is wrong. No window technique fixes that.
+> **`AGENTS.md` is the cross-harness operational context and routing layer.** The root file contains the concise floor every run needs: authority order, canonical paths, project commands, rule-loading requirements, internal-agent order, and runtime-artifact location. Scoped `AGENTS.md` files may specialize that context for a capability. Loader behavior differs by runtime, so transactional workflows explicitly read the target capability file when its presence in the effective instruction chain is not proven. A runtime-specific file such as `CLAUDE.md` may import or adapt `AGENTS.md`, but it is not a competing authority.
 
-Golden rules for every context file:
+`AGENTS.md` points to capability contracts and engineering rules; it does not duplicate them. The bundle ships a concrete root file to customize.
 
-- **Document only what the agent can't infer.** Don't describe folder structure — let the code and the layout speak. Stale structural references *actively mislead*; an absent one costs nothing. (Evidence suggests human-written context files help and machine-generated ones hurt — confirm in your own setting, but the direction is clear: write what the code doesn't reveal.)
-- **Package by feature, so the structure can speak.** The rule above only works if the folder layout actually reveals the domain — and that requires organizing code **by capability (vertical slice), not by technical layer**: `payments/`, `orders/`, `notifications/` each holding their own logic, not `controllers/`, `services/`, `repositories/` spread across the whole app. This is Robert C. Martin's *Screaming Architecture* — the top-level structure should shout the domain, not the framework. It is the same principle the specs already follow (partition by capability, never by technical layer), applied one level down to the code, and it is the precondition that lets you *not* describe structure: a capability-organized tree is self-evident where a layer-organized one is not. Package-by-feature is also what makes incremental identification converge: a capability-organized layout forces the question "which capability does this belong to?" on every new file, so boundaries sharpen as a side effect of the discipline. **The silent failure mode is package-by-entity disguised as package-by-feature:** folders named after data nouns (`product/`, `customer/`, `invoice/`) look like feature folders but reproduce the anemic slicing Stage 0 warns against. Three tests to tell them apart: the name is a **business verb/outcome, not a data noun** (`payments/` and `onboarding/` are things the product does; `customer/` is a table); the folder is a **vertical slice** (it holds that capability's rules, use cases, and persistence — not one horizontal layer of an entity); and **imports point inward** (if most other folders must reach into this one to complete any flow, it's a shared entity, not a capability). When a new folder fails these tests, rename the boundary around the business outcome — don't just redistribute files.
-- **Lean over complete.** "Minimal isn't short," but cut noise. Keep each context file tight — every token is loaded each turn.
-- **Binary acceptance.** Replace "typically/expected/better" with imperatives and measurable values. Without an executable test there's no correctness oracle beyond the user.
-- **Treat drift as a bug.** Specs and context files drift as code evolves, and there's no automatic staleness detection — version them and review the diffs **like code**. A false spec misleads more than an absent one.
-- **Don't overdose.** Half a page for a small change; the full template for a real capability.
+### Root `AGENTS.md`
 
-> **`AGENTS.md`/`CLAUDE.md` — the operational context file.** Throughout this guideline, "`AGENTS.md`/`CLAUDE.md`" means the operational context file that lives next to the code. The name depends on your tool: **`AGENTS.md`** is the open standard, read by Codex, Cursor, Kiro, OpenCode, Gemini CLI and others; **`CLAUDE.md`** is the name Claude Code uses. Same role, same mechanics — pick the one your tool reads. If you mix tools, keep an `AGENTS.md` and a thin root `CLAUDE.md` that does `@AGENTS.md`. Wherever this document writes one form, the other applies. **Same role — but loader semantics differ per tool** (Claude Code loads by proximity, lazily, when the agent touches a folder; Codex builds the instruction chain once at run start, project root → CWD — folders only touched later don't auto-load; check your adapter). When the runtime doesn't guarantee loading, the workflow reads the capability's context explicitly after identifying the target. Either way the file **points to** the capability spec rather than duplicating it. It is not the spec.
-
-### Root AGENTS.md/CLAUDE.md
-
-Target size: ~60 lines. Never exceed 100.
+Minimum responsibilities:
 
 ```markdown
-# [Project name]
+# Project agent instructions
 
-[1-2 sentences describing: what the system does and how it's divided into
-high-level pieces. E.g.: "Pipeline in N stages: stage-A → stage-B → stage-C.
-Each stage is an independent capability. Stages with internal complexity
-can be divided into sub-areas."]
+## Authority
+- Ratified capability contracts govern business semantics.
+- Approved ticket, plan, and scope constrain the current run.
+- Current code proves observed behavior, not intended behavior.
 
-## Commands
+## Canonical paths
+- Skills: `.agents/skills/`
+- Protocols: `.agents/protocols/`
+- Engineering rules: `.agents/rules/`
+- Internal agent contracts: `agents/`
+- Runtime state: `.agent-runs/<run-id>/`
 
-- `make build` — build full pipeline
-- `make test` — all tests
-- `make test-stage STAGE=<name>` — tests for one stage
-- `make test-area AREA=<name>` — tests for one sub-area (if applicable)
-- `make lint` — static checks
+## Rule loading
+- Read `.agents/rules/truth-layer.md` for every transactional change.
+- Read `.agents/rules/testing.md` for code, tests, or behavior changes.
+- Read `.agents/rules/package-by-feature.md` when production paths or boundaries change.
+- Do not assume `.agents/rules/` auto-loads merely because it exists.
 
-## Structure
+## Verification
+- <focused command>
+- <capability command>
+- <full gate>
 
-- `src/<capability>/` — code per capability; each has its own AGENTS.md/CLAUDE.md
-- `specs/<capability>/` — capability spec (source of truth), mirrors src/
-- `architecture/pipeline.md` — contracts between capabilities
-- `architecture/constitution.md` — non-negotiable principles
-- `docs/` — glossary, reference tables, norms/regulations
-- `.claude/rules/` — auto-loaded invariant rules
+## Internal hardening
+1. `general-code-reviewer`
+2. `mutation-hardener`
 
-## Non-negotiable principles
-
-Read `@architecture/constitution.md` before architectural decisions.
-
-## Reference documents
-
-- `@architecture/pipeline.md` — Read when: modifying contracts between capabilities
-- `@docs/<domain-glossary>.md` — Read when: encountering an unfamiliar domain term
-- `@architecture/decisions/` — Read when: making a new architectural decision
-
-## Plan Mode
-
-- Concise plan, sacrifice grammar for brevity
-- At the end, list "Unresolved questions" if any
-- For rules with a normative source: cite the source before implementing
-
-## Lessons learned
-
-(add here when Claude makes a reproducible mistake and the fix
-needs to become permanent — keep it short, with an explicit cap)
+Every handoff returns an exact commit/report to the Owner for inspection.
 ```
 
-### AGENTS.md/CLAUDE.md per capability
+Keep domain detail in the capability contract, architectural trade-offs in ADRs, and reusable engineering obligations in `.agents/rules/`.
 
-Each capability (or functional area) has its own, **next to the code** (`src/<capability>/AGENTS.md/CLAUDE.md`), not in `specs/`. It's loaded by proximity when the agent edits a file in that capability. Target size: 20-40 lines.
+### `AGENTS.md` per capability
 
-Function: **pointer + navigation context, not a copy of the spec.** It summarizes the essentials and points to the full spec — it does not embed all the rules (otherwise it duplicates the spec and inflates context on every edit). Template:
+A scoped file next to `src/<capability>/` is a pointer and navigation aid, not a copy of the spec. It should name the stable contract entrypoint, scope/non-goals, unusual commands, relevant rules, and local ownership constraints. Transactional skills read it explicitly when required.
 
 ```markdown
-# <Capability / functional area name>
+# <Capability>
 
-**Spec (source of truth):** specs/<capability>/<capability>.md
-Read the spec before modifying any domain rule in this capability.
+**Contract:** `specs/<capability>/<capability>.md`
+Read the logical corpus before changing domain behavior.
 
 ## Scope
+<what this capability owns and explicitly does not own>
 
-[2-3 sentences: what this capability does and does NOT do.
-E.g.: "Classifies incoming events per [domain] rules,
-flags edge cases. Does NOT compute final values — that's
-the responsibility of <downstream-capability>."]
+## Verification
+- Focused: `<command>`
+- Capability gate: `<command>`
 
-## Key rules (summary)
-
-[The 3-5 most important rules, summarized one line each.
-Full detail and edge cases are in the spec. Here it's only the essentials
-the agent needs to keep in mind on every edit.]
-
-## Where things are
-
-[Navigation within this folder: where what lives. E.g.: "flows in
-flows/, shared components in shared/, rules in rules.ts"]
-
-## Contracts
-
-- Input/Output: see specs/<capability>/contracts/
-
-## Lessons learned
-
-(empty — add as mistakes appear)
+## Local constraints
+- <only non-obvious, recurrent constraints>
 ```
 
-The distinction that matters: **trivial edit** (bugfix, refactor) is resolved with the summary in AGENTS.md/CLAUDE.md — the agent doesn't need the whole spec. **Domain-rule edit** triggers reading the full spec, which the pointer indicates. This way the essentials are always present (cheap) and the full spec is read on demand.
+Do not import the entire contract corpus into `AGENTS.md`; keep a stable pointer and load the full authority when the change touches semantics.
 
-Don't use `@import` to pull the whole spec into AGENTS.md/CLAUDE.md — that loads the spec on every edit, even trivial ones, burning context. A textual pointer + conditional instruction ("read before touching a rule") is more economical.
-
-**Conditional rules — use a real mechanism, not a prompt trick.** `<important if="...">`-style tags circulate in the community, but they are not a loading mechanism: the model may or may not honor the condition, and the wrapped rule still costs context on every session. For a rule that only applies in a specific situation, use the mechanisms that actually gate loading: move it to `.claude/rules/<rule>.md` with `paths:` frontmatter (official — the rule lazy-loads only when Claude touches files matching the glob), or rely on per-context AGENTS.md/CLAUDE.md proximity loading. Keep always-loaded rules to the few that genuinely apply everywhere.
+**Conditional rules are routed explicitly.** `.agents/rules/` is the canonical repository location, not a cross-harness auto-loading primitive. The root `AGENTS.md` and transactional skills decide which rules apply from the task class, touched paths, and approved scope. Runtime-specific path-scoped loading may be added as an optimization, but shared correctness must not depend on it.
 
 ### Constitution
 
@@ -467,84 +369,55 @@ Breaking this separation requires an ADR.
 A past-period rule does not change retroactively in the code, even if the current interpretation differs. Explicit versioning of rules by validity period.
 ```
 
-### .claude/rules/
+### Shared engineering rules (`.agents/rules/`)
 
-Short rules, auto-loaded every session. Each file handles a specific topic. Example (`.claude/rules/decimal-handling.md`):
+Rules are short, stable, versioned instructions for recurrent engineering obligations. The root `AGENTS.md` routes them; transactional skills and internal agents read applicable rules explicitly. The directory itself does not guarantee loading.
 
-```markdown
-# Decimal handling
+The bundle ships:
 
-ALL high-sensitivity numeric calculations use precise-decimal type
-(Python Decimal, Java BigDecimal, equivalent). Never use float.
+- `truth-layer.md` — protects specs, reference/golden oracles, baselines, and named write flows;
+- `testing.md` — selects evidence boundaries, requires regression coverage, mutation hardening, and property/fuzz testing when applicable;
+- `package-by-feature.md` — keeps production code within the capability that owns its language, rules, and outcome.
 
-When converting from external sources:
-- Strings from XML/JSON: Decimal(string), never float()
-- Database NUMERIC: ORM should return Decimal natively
-- JSON: parse string fields, not float fields
+A new rule should be added only when the obligation is recurrent, materially costly to forget, and reviewable or mechanically enforceable. Keep explanation/examples in references when the rule would otherwise become a manual.
 
-Rounding: ROUND_HALF_EVEN unless a normative source specifies otherwise.
-Document deviations inline with citation.
-```
+**Instructions are not enforcement.** `AGENTS.md` and `.agents/rules/` guide behavior. Guarantees belong in deterministic validators, permissions, fast-feedback hooks where available, and final-state CI. A silently edited oracle or lowered threshold must fail mechanically regardless of the harness that produced the candidate.
 
-Keep each file under 30 lines. If it grew, split it.
+The Claude-specific hook `.claude/hooks/require-spec-for-new-capability.sh` remains an optional adapter for fast feedback. It is not the shared authority and does not replace CI.
 
-A second rule worth shipping from day one: `.claude/rules/package-by-feature.md` (included in this system's bundle). It applies the capability-vs-entity tests at file-creation time — the **feedforward** layer of the same control the reviewer criterion covers at review time and the quarterly co-change/dependency check covers for drift. For mechanical enforcement of the checkable part, a PreToolUse hook can block creating `src/<new-folder>/` when no matching `specs/<new-folder>/` exists — enforcing package-by-feature **and** spec-before-code at once; naming quality (business verb vs data noun) can't be checked deterministically and stays with the rule and the reviewer. An example hook ships in the bundle (`.claude/hooks/require-spec-for-new-capability.sh`, opt-in — the settings snippet to wire it is in its header).
+### Skills (`.agents/skills/`)
 
-A third rule ships beside it: `.claude/rules/truth-layer.md` — the always-loaded guard for `specs/**`, the golden, and the ratchet baseline. Casual sessions read truth, never write it; changes go through the named flows (`/to-spec` for content, in-session human approval for criteria, the human's signature for reference values, the ratchet's own step for the baseline) — a silently edited reference table corrupts the oracle: everything downstream goes green *and lying*. The rule also carries the two floor behaviors every session owes, with or without a skill (typed branch, never the default; "done" demonstrated with runner output visible). In a dual-harness repo the content dissolves into the root `AGENTS.md`, per the coexistence table.
+Skills are folders containing an explicit workflow, references, and optional deterministic scripts. Codex and Cursor can consume repository skills from `.agents/skills/`; other runtimes may use an adapter. Transactional skills are invoked explicitly, while reference skills may be loaded by description when the runtime supports it.
 
-**Important:** AGENTS.md/CLAUDE.md and `.claude/rules/` have ~70% adherence by the model (an observed operating figure, not a measured benchmark). For behaviors that need a guarantee — like "never float on a sensitive value" in a regulated domain — promote to a **deterministic check**. A hook is deterministic **within the event and matcher it intercepts**: fast feedback, not a global guarantee (other tools and paths bypass it). The authority is the CI / pre-merge gate that examines the final state regardless of how it was produced; hook + CI together give fast feedback *and* the real guarantee. A rule alone doesn't give a guarantee in code where a mistake is costly. Decimal handling is the first candidate in any system dealing with money or critical quantities.
+Use a skill when ordering, gates, side effects, state, or reusable tooling matter. Use a rule for a short recurrent obligation and a document for durable knowledge.
 
-### Skills (`.claude/skills/`)
+Principles:
 
-Skills are folders (not just files) that Claude discovers, reads, and uses on demand. Unlike `.claude/rules/` (loaded every session) and AGENTS.md/CLAUDE.md (loaded by hierarchy), Skills only load when Claude decides to trigger them — based on the SKILL.md `description` field.
-
-**When to create a Skill instead of a rule or doc:**
-
-- It has associated code (scripts, libs, examples) — not just text
-- It applies in specific situations, not every session
-- It's worth having "memory" (prior execution logs, persistent config)
-
-**Useful categories (from what Anthropic mapped internally):**
-
-- **Library & API Reference:** wrappers for external integrations. API reference + known gotchas + correct-usage examples.
-- **Product Verification:** scripts that validate outputs against reference datasets/oracles. Worth spending a week on a well-built one when the domain is regulated or critical.
-- **Code Quality & Review:** project-specific checks (does every rule cite its source when required? Correct numeric type? Audit trail present?).
-- **Runbooks:** divergence investigation ("output differs from expected → correlate with which rule → identify cause").
-
-**Principles for writing a Skill:**
-
-1. **Description is a trigger, not a summary.** The `description` is what Claude reads to decide "is it worth triggering this skill now?". Write it for the model to decide, not for a human to summarize. "Use when validating computation of X against a reference dataset" — not "Skill for validating X."
-2. **The gotchas section is the highest-value content.** List the points where Claude makes mistakes using this skill. It grows over time. More valuable than "how to use" docs.
-3. **Don't state the obvious.** Focus on what pulls Claude out of default behavior. If the skill is "how to use external API X," document that the staging environment has a different rate limit, that the certificate expires without warning — not what's in the types.
-4. **Don't tie Claude to a step-by-step.** Give it the goal and constraints, not a rigid recipe.
-5. **Use the filesystem as progressive disclosure**:
+1. The description is a routing trigger, not a summary of the entire workflow.
+2. Put the state machine and load-bearing gates in `SKILL.md`; place detail in `references/` and deterministic behavior in `scripts/`.
+3. Document non-obvious failure modes and rationalizations, not facts already visible in code or types.
+4. Transactional skills must declare explicit invocation and honest terminal states.
+5. Grow skills from observed failures and evals, not speculative completeness.
 
 ```
-.claude/skills/<skill-name>/
-├── SKILL.md           ← description + when to trigger + gotchas
+.agents/skills/<skill-name>/
+├── SKILL.md
 ├── references/
-│   └── <ref-doc>.md
 ├── scripts/
-│   └── validate.py    ← reusable script
-└── examples/
-    └── <use-case>.md
+└── agents/openai.yaml        # optional runtime metadata
 ```
-
-**Start small.** Anthropic's Skills started as a few lines + one gotcha. They grew as mistakes appeared. Don't design the perfect Skill before using it.
-
----
 
 ## Part 3 — Layer 2: Active work
 
-Implementation plan, research notes, decisions for the feature being built. Lives in Claude Code's Tasks system or ad-hoc files — disposable afterward.
+Each implementation run owns a gitignored directory at `.agent-runs/<run-id>/`. It contains the proven delta, assumptions, approvals, plan, scope, evidence, logs, hardening targets/handoffs, Owner dispositions, final candidate identity, and terminal result. Chat/task UIs are convenience views only; the run directory is the operational record for resume and audit, and a sanitized copy may be retained by CI.
 
 ### How to create a spec
 
-There is **one spec type — the capability spec, always permanent.** The old "disposable feature spec" is gone: what is disposable is the implementation *plan*, not a spec (see "Large features in an existing capability" below).
+There is **one durable contract type — the logical capability spec corpus.** The old "disposable feature spec" is gone: what is disposable is the implementation plan, not a second semantic authority.
 
-**The capability spec (permanent)**
+**The capability spec corpus (permanent)**
 
-Lives in `specs/<capability>/<sub-area>/<file>.md`. Created once per capability. Updated when architecture or a domain rule changes. **Human authority, not necessarily human authorship** — agents may research, draft, and materialize proposals; what makes a spec the business source of truth is the human-protected ratification (the merge on the protected branch). **Spec evolution during implementation follows the writer matrix**: the **supervised** adapter may materialize an amendment after an explicit in-session human gate (semantic-amendment: affected IDs, old → proposed meaning, rationale — the PR ratifies with `requires_human_approval`); **orchestrated and unattended** adapters are proposal-only, materializing through `/to-spec` + the protected-branch PR. A spec change is a business-rule change: the human gate precedes any code guided by the new meaning — never normalize intent to match code.
+Has one stable entrypoint such as `specs/<capability>/<capability>.md`. It may remain one file or declare companion files under the same capability directory. Created once per capability. Updated when architecture or a domain rule changes. **Human authority, not necessarily human authorship** — agents may research, draft, and materialize proposals; what makes a spec the business source of truth is the human-protected ratification (the merge on the protected branch). **Spec evolution during implementation follows the writer matrix**: the **supervised** adapter may materialize an amendment after an explicit in-session human gate (semantic-amendment: affected IDs, old → proposed meaning, rationale — the PR ratifies with `requires_human_approval`); **orchestrated and unattended** adapters are proposal-only, materializing through `to-spec` + the protected-branch PR. A spec change is a business-rule change: the human gate precedes any code guided by the new meaning — never normalize intent to match code.
 
 Method: research-driven. The source of truth is external (norms, regulation, existing systems, client documents).
 
@@ -553,15 +426,15 @@ A frontend functional area is just a capability whose inputs/outputs are flows a
 How:
 
 1. Create the empty file at the correct path.
-2. Start a Claude Code session in Plan Mode.
-3. Use the `/shape` slash command (then `/to-spec` writes the file) or a direct prompt:
+2. Start a planning-capable session in the target repository/capability.
+3. Invoke the explicit `shape` skill (then `to-spec` writes the file) or use a direct prompt:
 
 ```
 I'm going to create a spec for [capability]. Use the template in
 spec-templates/capability-spec.md.
 
 Research first:
-- Read <upstream-context>/AGENTS.md/CLAUDE.md (the input we receive)
+- Read <upstream-context>/AGENTS.md (the input we receive)
 - Read architecture/pipeline.md (the output contract)
 - Read architecture/constitution.md (principles)
 
@@ -579,207 +452,176 @@ List open questions if there's ambiguity.
 
 There is no separate "feature spec." When a change is bigger than three sentences but lands in a capability that already has a spec, you do two things — neither of which is a new permanent artifact:
 
-1. **The work starts as a spec delta and lands as frontier slices** — `/shape` interrogates against the existing spec and `/to-spec` writes the delta (new rules and criteria issued as typed stable IDs in continuation); after the delta merges at the gate (the rule-merge below), `/spec-to-tickets` breaks the feature into tracer-bullet slices, each carried by its own normal-sized plan (protocol Phase 3) — the same planning `implement-feature` already produces. Plans remain disposable: scaffolding for each slice, discarded when it lands.
-2. **If the feature introduces a new business rule, that rule is merged into the capability spec** — because a rule is a source of truth, and source of truth lives in the permanent spec (with `requires_human_approval`, since it's a business-rule change). If merging it would make the capability spec too big to maintain, that is the signal to split the capability by boundary — the normal decomposition mechanism, not a new spec type.
+1. **The work starts as a spec delta and lands as frontier slices** — `shape` interrogates against the existing spec and `to-spec` writes the delta (new rules and criteria issued as typed stable IDs in continuation); after the delta merges at the gate (the rule-merge below), `spec-to-tickets` breaks the feature into tracer-bullet slices, each carried by its own normal-sized plan (protocol Phase 3) — the same planning `implement-feature` already produces. Plans remain disposable: scaffolding for each slice, discarded when it lands.
+2. **If the feature introduces a new business rule, that rule is merged into the capability spec** — because a rule is a source of truth, and source of truth lives in the durable capability corpus (with `requires_human_approval`, since it's a business-rule change). If the corpus becomes difficult to maintain, first split it into declared companion files under the same stable entrypoint. Split the capability itself only when language, ownership, invariants, transaction boundaries, or change cadence show a real domain boundary.
 
-So the durable record of a large feature lives in three places, each with its role: the **rule** goes into the capability spec, the **plan** is discarded, and the **understanding of what was done and why** goes into the `/explain` walkthrough (`docs/walkthroughs/`). None of these is a "feature spec."
+So the durable record of a large feature lives in three places, each with its role: the **rule** goes into the capability corpus, the **plan/run evidence** lives under `.agent-runs/<run-id>/` during execution, and the **human-facing understanding of what was done and why** may go into the `explain` walkthrough (`docs/walkthroughs/`). None of these is a "feature spec."
 
 **When does a change get no spec at all?** If you can implement it directly from the existing capability spec — it only combines rules already there and introduces no new source of truth — go straight to implementation with a light plan. The test is not lines of code; it is "does this introduce a rule the capability spec doesn't already cover?"
 
-### Recommended slash commands
+### Recommended explicit workflow skills
 
-Saved in `.claude/commands/`. Versioned in the repo.
+Saved canonically as `.agents/skills/<name>/SKILL.md` and versioned in the repository. Runtime adapters may add metadata or launcher syntax, but they do not create another workflow authority.
 
-**`/plan-from-issue.md`** — generates a phased implementation plan from a GitHub issue (reads the issue, the capability's context file and spec, enters Plan Mode; no implementation). Ships in the bundle.
+**`plan-from-issue`** — generates a phased implementation plan from a GitHub issue (reads the issue, the capability's context file and spec, enters Plan Mode; no implementation). Ships in the bundle.
 
-**`/shape.md`** — the work-shaping interview, working the question frontier in rounds — every currently-askable question at once, each with a recommended answer — the codebase consulted before the human. Interrogates an idea, a transcript, existing code, or an existing spec (grill-back: divergence probe, boundary probe, oracle coverage), or sharpens a task — the interview only; `/to-spec` writes the file. Ships in the bundle.
+**`shape`** — the work-shaping interview, working the question frontier in rounds — every currently-askable question at once, each with a recommended answer — the codebase consulted before the human. Interrogates an idea, a transcript, existing code, or an existing spec (grill-back: divergence probe, boundary probe, oracle coverage), or sharpens a task — the interview only; `to-spec` writes the file. Ships in the bundle.
 
-**`/to-spec.md`** — writes or updates the capability spec from the interview: fills the template from a `/shape` session (or provided notes), never interviews back — gaps become open questions; new items issued as typed stable IDs in continuation, existing IDs never touched. Ships in the bundle.
+**`to-spec`** — writes or updates the capability spec from the interview: fills the template from a `shape` session (or provided notes), never interviews back — gaps become open questions; new items issued as typed stable IDs in continuation, existing IDs never touched. Ships in the bundle.
 
-**`/prep.md`** — one-time repository preparation: the three-command verification interface (`check` / `check-<capability>` / `golden`), the metric-class gates (stack-agnostic: the class is the requirement, the tool an instance; absence = named blocker), the golden harness skeleton reading `specs/<cap>/tables/`, minimum CI as visible checks, and the ratchet baseline (grandfather the count; it only shrinks). Brownfield-safe, proven by running. Ships in the bundle.
+**`prep`** — one-time repository preparation: the verification interface (`check` / `check-<capability>` / `golden` / `mutation-<capability>` / `fuzz-<capability>`), the metric-class gates (stack-agnostic: the class is the requirement, the tool an instance; absence = named blocker), the golden harness skeleton reading `specs/<cap>/tables/`, minimum CI as visible checks, and the ratchet baseline (grandfather the count; it only shrinks). Brownfield-safe, proven by running. Ships in the bundle.
 
-**`/orchestrate.md`** — full-project orchestration in **resolution-gated waves** (the gkpacker field pattern, source #48, adapted): wave table from the explicit `Blocked by` graph; one worker per ticket in child worktrees cut from fresh, verified `origin/main`; persistent monitor with CI and review **fingerprints** (new feedback revokes review-ready — CI green is not the whole gate); reviewer-triage taxonomy for humans, bots, and agents; applicable-lens review on every PR; human merges gate each wave. Orca mechanism loaded at runtime (`ORCA skills get orca-cli`); baked-in defaults never re-asked; caps, question policy, and the 2-consecutive halt built in. Ships in the bundle.
+**`orchestrate`** — full-project orchestration in **resolution-gated waves** (the gkpacker field pattern, source #48, adapted): wave table from the explicit `Blocked by` graph; one worker per ticket in child worktrees cut from fresh, verified `origin/main`; persistent monitor with CI and review **fingerprints** (new feedback revokes review-ready — CI green is not the whole gate); external-review triage for humans, bots, and APIs, keyed to the exact PR head; human merges gate each wave. Orca mechanism loaded at runtime (`ORCA skills get orchestration --full`); baked-in defaults never re-asked; caps, question policy, and the 2-consecutive halt built in. Ships in the bundle.
 
-**`/spec-to-tickets.md`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's pointed stable IDs, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
+**`spec-to-tickets`** — breaks a committed capability spec (or the shaping session that produced it) into tracer-bullet tickets anchored on the spec's pointed stable IDs, each with blocking edges; quizzes the human on granularity and edges before publishing to a local `tickets.md` or to GitHub Issues, blockers first so edges reference real ids. Wide refactors go expand–contract. Ships in the bundle.
 
-**`/review-spec-drift.md`** — the periodic whole-capability audit: spec ↔ code ↔ contracts divergence, reported as critical / relevant / cosmetic drift. Complements `conformance-review`, which is diff-scoped. Ships in the bundle.
+**`review-spec-drift`** — the periodic whole-capability audit: spec ↔ code ↔ contracts divergence, reported as critical / relevant / cosmetic drift. Complements the external diff-scoped conformance review. Ships in the bundle.
 
-**`/implement.md`** — discoverability redirect only: it points you at the direct invocation (`/implement-feature …`) — the transactional skills are user-invocation-only, so no command body can load them for you. Ships in the bundle.
+**`implement`** — explicit convenience alias for the complete `implement-feature` skill. It loads and follows the supervised adapter without duplicating its gates. Ships in the bundle.
 
-Three entry points, by mode — **each invoked directly by its user or launcher** (the transactional skills are user-invocation-only; a wrapper or a `/goal` condition that merely *names* a skill does not load it): **local** = `/implement-feature …` typed by you, interactively; **orchestrated** = `/implement-orchestrated issue #N --mode …` as the worker's first message; **unattended** = `/implement-backlog …` invoked directly by the launcher. The line that separates them is not `/goal` itself but **interactive vs headless**: interactively, a gate question pauses the turn, you answer, and the answer enters the transcript — gates and loop coexist (verified in practice); headless, there is no one to answer, so gates are replaced by named-blocker aborts.
+Three entry points exist by mode, each invoked directly using the current runtime's skill syntax:
 
-### Optional: `/goal` as a composition — experimental, eval-gated
+- **supervised:** `implement-feature <issue|slice>` (or the `implement` alias), with human gates in-session;
+- **orchestrated:** `implement-orchestrated issue #N --mode <assisted|autonomous>` as the worker's first instruction;
+- **unattended:** `implement-backlog issue #N`, invoked by a launcher that validates the structured terminal.
 
-The recommended local path is the **direct invocation** of the adapter (`/implement-feature …`). `/goal` is a session-scoped Stop hook whose evaluator reads only the transcript: it can add a completion re-check on top of a run, but **it is not the engine and it never loads a skill** — setting a goal starts a turn of its own, so the composition (goal set, then adapter invoked) is unproven until an eval covers it. Treat the recipes below as an experiment, not doctrine. The condition is everything: **write it to demand evidence, not claims**. Task-based:
+Ordinary prose that merely names a transactional skill is not a valid launch contract. Interactive modes may wait for human decisions; headless modes replace every would-be question with a named blocker or an externally mediated approval.
 
-```text
-/implement-feature task #<N>   # direct invocation; wrap in a supervised /goal only as a separately verified composition — naming the skill inside a goal condition does not load it
-Done when ALL of the following hold:
-- every phase of implement-feature ran, and the plan (protocol Phase 3) was
-  explicitly approved by the user in this session;
-- every acceptance criterion of task #<N> is verified by a passing
-  test, with the runner's real output visible in this session — not
-  by claim;
-- any criterion no executable test can verify is explicitly listed
-  as NOT MACHINE-VERIFIED in the final summary;
-- the full suite is green; the reviewer reports zero [BLOCKER];
-- the work branch is pushed and a PR is open, its description on the
-  shared template (Approved plan included);
-- hard cap: 30 turns.
-```
+### Optional runtime completion loops
 
-Spec-based (a new capability — remember: the spec is the source of truth, the run/issue is the execution unit; slice a large capability into issues that *point at* the spec's criteria instead of copying them, and make the first slice the walking skeleton when the capability has contracts with others):
+A runtime may provide a completion re-check such as Claude Code's `/goal`. Treat it as an optional, separately evaluated wrapper around a directly invoked transactional skill — never as the skill loader or canonical engine. The evaluator must be bound to artifact evidence and honest terminals, and the composition must be qualified for the exact harness/model configuration before operational use.
+
+The portable launch contract remains the explicit skill invocation and `.agent-runs/<run-id>/result.json`.
+
+### Implementation skills and internal hardening agents
+
+The three implementation skills are owner adapters over
+`.agents/protocols/implementation-protocol.md`. They share phases 0–10 and differ
+only in who satisfies ambiguity, approval, truth-change, and scope-expansion
+gates:
 
 ```text
-/implement-feature <capability> — implement the capability from
-specs/<capability>/<capability>.md — invoke `/implement-feature <spec slice>` directly (a `/goal` condition that names a user-only skill does not load it).
-Done when ALL of the following hold:
-- every phase ran, and the plan (protocol Phase 3) was explicitly approved by
-  the user in this session;
-- every criterion in the spec's "Acceptance criteria" section [or
-  the slice: its pointed IDs] is verified by its declared method with the
-  runner's real output in this session — not by claim;
-- every row of the spec's reference-value table is covered by a test
-  asserting input → expected output;
-- criteria no executable test can verify are listed as
-  NOT MACHINE-VERIFIED in the final summary;
-- nothing outside the spec's Non-goals was implemented;
-- full suite green; reviewer reports zero [BLOCKER], with
-  conformance-review applied (diff vs spec);
-- the work branch is pushed and a PR is open, its description on the
-  shared template (Approved plan included);
-- hard cap: 40 turns.
+implement-feature
+    human in-session
+
+implement-orchestrated
+    GitHub/orchestrator-mediated
+
+implement-backlog
+    mechanical-or-abort
 ```
 
-Two operational notes. A "no" at a gate **redirects** the worker; it does not end the run — the condition stays unmet and the evaluator forces another turn; the real stop button is the interrupt, outside the loop's semantics. And a plain direct invocation (`/implement-feature`, no `/goal` wrapper) remains right for small increments, where the composition's overhead exceeds what it protects.
-
-### Implementation skills
-
-The mode adapters materialize the implementation workflow as an executable folder in `.claude/skills/`. They're a natural evolution of the slash commands above: instead of generating a plan or comment, they run the Plan → Implement → QA → Close the loop cycle end to end.
-
-**`implement-feature`** — local skill, human-driven.
-
-For interactive use in local Claude Code. Covers three scenarios, all starting from an **existing** spec or backlog item (spec creation/refinement is out of scope):
-
-1. Implementing a new capability — starting from the human-led spec
-2. Implementing a large feature in an existing capability — from a spec delta merged at the gate, then `/spec-to-tickets` slices worked from the frontier, each with its own normal-sized plan (protocol Phase 3)
-3. Increment — starting from an issue or direct prompt
-
-The canonical machine is the shared protocol
-(`.claude/protocols/implementation-protocol.md`, **phases 0–9** —
-preflight, proven delta, understand, plan, implement, verify, durable
-sync, seal, review, deliver). The bullets below are the
-**supervised-local adapter's pass** through it (protocol phase in
-parentheses); the human satisfies every gate in-session. Before the
-first bullet, the protocol runs Phase 0 (authority + pinned-commit
-preflight) and Phase 1 (proven delta — a no-gap finding is a
-`NO_CHANGE_CANDIDATE`, and only the Phase 8 evidence-target review
-turns it into the `NO_CHANGE_REQUIRED` terminal). The bullets below
-are listed in protocol order: durable sync (Phase 6) finishes BEFORE
-the seal (Phase 7), and the review (Phase 8) judges the sealed
-candidate — any fix returns to Phase 4, re-verifies, re-syncs if
-needed, and re-seals before a new review:
-
-- **Understand (protocol Phase 2)** — reads the instruction, input (spec/issue), root AGENTS.md/CLAUDE.md → capability AGENTS.md/CLAUDE.md → pointed spec, `.claude/rules/`, `lessons.md`. Maps affected code.
-- **Resolve ambiguities (protocol Phase 2, gate)** — surfaces ambiguities via AskUserQuestion. Does not proceed with unresolved ambiguity.
-- **Plan (protocol Phase 3; APPROVAL-FINGERPRINT logged)** — ULTRATHINK in plan mode (read-only). Lists files it will edit (committed scope), and separates load-bearing decisions (which determine whether the approach works or which architecture is committed — pinned now) from deferred details (reversible, left to implementation).
-- **Implement (protocol Phase 4)** — executes the plan on a typed work branch (`feature/`, `fix/`, `refactor/`, `chore/`). Runs lint + typecheck + the touched tests every chunk (not batched at the end), not advancing while red; tests anchor on the spec's acceptance criteria, not on the implementation. Commits during the phase, at a granularity that aids review (the skill's judgment, not 1:1 with plan steps). Editing outside the committed scope requires explicit human approval.
-- **Verify (protocol Phase 5)** — full local suite. Doesn't proceed until green.
-- **Durable sync (protocol Phase 6) → Seal (Phase 7)** — see the next bullet for what durable sync writes; the seal then freezes base/head and the full suite runs on the final tree.
-- **Review (protocol Phase 8)** — dispatches the `reviewer` agent (the router, see below) via the Agent tool (renamed from Task; the alias still works) in isolated context against the **sealed candidate**; it routes to the applicable review-criteria skills. Any fix returns to Phase 4 and re-seals — no PR ships a changeset the review did not see.
-- **What durable sync writes (protocol Phase 6)** — appends to lessons, a spec amendment **only under the supervised writer matrix** (in-session gate + `requires_human_approval` on the PR; other modes are proposal-only), AGENTS.md/CLAUDE.md proposal (propose-only, doesn't edit directly), backlog status. `lessons.md` carries a line budget (~150 lines): when full, curating means replacing, not appending — an unbounded lessons file becomes a megafile no agent reads. The entry bar is the **surprise encounter**: what made *this* trajectory longer than the next one needs to be (source #42; curation stays human — propose-only holds). The form test is Garg's heuristic (source #49): would a reasonably competent agent make the right decision **once it knew the one missing fact**? If yes, the lesson states the fact; a lesson that specifies a decision procedure (approvals, checkpoints, rituals) is bureaucracy where a clarification would have done.
-- **Delivery (protocol Phase 9)** — pushes the typed branch, opens a PR (shared template, Approved plan + fingerprint included), reports in chat, and ends at `PR_READY_AWAITING_HUMAN`.
-
-Structured logging in `.claude/logs/implement-{timestamp}.md` for auditability. The logs are also the metrics source: **rework rate** (Replans + review-fix iterations per merged PR), **cycle time** (label-to-merge), and — once `EVALS.md` exists — eval scores per run; the raw fields already ship in the log templates (source #31).
-
-**`implement-backlog`** — autonomous skill, agent-driven.
-
-For end-to-end execution **with no human in the loop**. The launcher is **external and explicit** — a thin GitHub Action invokes the skill **directly** — `claude -p "/implement-backlog issue #<N>"` — when an issue gets an `auto-implement` label, and validates the terminal state **outside the transcript** (the DONE contract below is the launcher's checklist, not a goal condition: naming a user-only skill inside `/goal` does not load it). There is no custom orchestrator service — the Action is the launcher, the skill is the workflow, the `reviewer` carries the criteria. A scheduled Routine is the sibling wiring; its canonical prompt ships in the bundle (`.claude/routines/frontier-worker.md`): scan the frontier, claim one issue, invoke the skill directly.
-
-One property of headless runs governs the whole design: **a question to the user never gates a headless run** — there is no one to answer, and the evaluator reads only the transcript, so an interactive gate would be silently overrun rather than block. That is why this skill never asks: every would-be question is a **named-blocker abort** (the only human stop the evaluator can read), and human judgment moves to the ends — the issue's acceptance criteria before the run, the PR review after it.
-
-Scope restricted to increment. Issues describing a new capability or a large feature are routed back to `implement-feature` with a comment and label.
-
-Same phase structure as `implement-feature`, with critical differences:
-
-- No human confirmations between phases. Decisions go to the log and the PR description; human review happens at the PR.
-- **Plan review (protocol Phase 3)** — since no human reviews the plan, a `reviewer` subagent does: it applies `plan-review` to judge the approach against failure modes, fit, and pinned load-bearing decisions, iterating until sound before any code. This is the gate that replaces implement-feature's human approval of the plan.
-- **Ambiguity (protocol Phase 2)** — comments on the issue (numbered list + proposed interpretations), applies a `needs-refinement` label, aborts. Doesn't try to resolve autonomously. Aborting early is cheaper than producing a PR based on a wrong interpretation.
-- **Phase 3 (scope expansion)** — comments on the issue, applies a `scope-expansion-needed` label, aborts. Doesn't silently expand.
-- **Verification (protocol Phase 5)** — cap of 3 iterations on the same failure. On hitting it, comments on the issue (`qa-blocked` or `review-blocked`) and aborts.
-- **Spec conflict** — `SPEC_CHANGE_REQUIRED`: amendment proposal on the issue; the run blocks. This adapter never edits semantics.
-- **Delivery (protocol Phase 9)** — opens a PR, comments on the issue with the link, and ends at `PR_READY_AWAITING_HUMAN`. A separate monitor observes CI flips, late feedback, and the merge — the run never claims "landed".
-
-Prerequisite to turn on in production: the narrow-start conditions of Part 5 — a hard-coded allowlist of trivial increment classes, CI green mandatory before review, and a human approving every PR. **Widening** (more classes, more volume, any step toward auto-merge) additionally requires the regression suite with a track record (`AUTONOMY-PLAYBOOK.md`, `EVALS.md`); widening without it is faith.
-
-**The launch contract, concretely.** The Action's `prompt` IS the
-direct invocation (`/implement-backlog issue #<N>`); the launcher
-validates the structured terminal **outside the transcript**. `/goal`
-is an optional, runtime-specific composition — eval-gated, never the
-engine, never a loader. DONE when ONE holds:
+All three use the same internal authoring pipeline after the owner has
+implemented and verified the approved task:
 
 ```text
-A. PR_READY_AWAITING_HUMAN — PR open on the shared template, every
-   pointed criterion evidence-verified. CI flips, late feedback and
-   the merge belong to the external monitor, never to the run.
-B. NAMED_BLOCKER — specific blocker commented, label applied, claim
-   released.
-C. NO_CHANGE_CANDIDATE → corroborated NO_CHANGE_REQUIRED — evidence
-   target posted, fresh-context review corroborated, claim released,
-   no PR by design.
+Owner implementation
+    → General Code Reviewer authoring loop
+    → owner inspects and accepts/rejects the exact handoff commit
+    → Mutation Hardener authoring loop to the 100% target contract
+    → owner inspects and accepts/rejects the exact handoff commit
+    → final deterministic verification
+    → PR_READY_AWAITING_HUMAN
 ```
 
-A thin GitHub Action invokes it headlessly on the label. The skeleton below is conceptual — confirm the real Claude Code CI setup (install, auth, `gh` permissions, the official Claude Code GitHub Action vs raw `claude -p`) against the headless and GitHub Action docs before relying on it:
+Both internal agents inherit the effective model of the Owner/parent worker and
+run with `effort=max`. The canonical contracts intentionally pin no model; Codex
+TOML adapters override only `model_reasoning_effort = "max"`. A lower or unknown
+effective effort is a configuration blocker, never a silent model switch or
+runtime fallback.
 
-```yaml
-name: frontier-worker
-on:
-  issues:
-    types: [labeled]
-jobs:
-  implement:
-    if: github.event.label.name == 'auto-implement'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: anthropics/claude-code-action@v1
-        with:
-          prompt: "/implement-backlog issue #${{ github.event.issue.number }}"
-          claude_args: "--max-turns 60"
-      # the launcher then validates the structured terminal
-      # (result artifact) outside the transcript — never a /goal
-      # condition naming the skill
+The Owner remains accountable for the task. Each authoring agent runs from an
+exact committed checkpoint in an isolated worktree, commits its complete delta,
+and returns an alteration report containing input SHA, output commit, modified
+paths, what changed, commands/results, risks, and owner-inspection instructions.
+The Owner must inspect the entire diff, validate scope and approved behavior,
+and rerun affected checks before accepting the handoff. Agent output is never
+self-validating.
+
+**`implement-feature`** is the supervised default. It researches the issue and
+code, separates facts/decisions/assumptions, asks the human only for
+load-bearing unresolved choices, proves the delta, obtains human approval of
+plan/scope/evidence/mutation target, implements, runs both internal hardeners,
+and opens a hardened PR. A supervised semantic amendment may be materialized
+only after its explicit human gate; protected-main integration ratifies it.
+
+**`implement-orchestrated`** owns one ticket, one worktree, and at most one PR.
+Assisted mode pauses for `approved <fingerprint>`; autonomous mode may proceed
+only when the ticket and policy already authorize every load-bearing choice.
+Both modes abort on ambiguity, truth change, or scope expansion. The worker runs
+the two internal hardeners; the orchestrator/pipeline owns external review and
+CI monitoring after the PR.
+
+**`implement-backlog`** is unattended and mechanical-or-abort. It never asks a
+question or invents a semantic decision. Its plan must be a mechanically
+validated subset of the qualified ticket and policy; otherwise it returns a
+named blocker. It runs the same two internal hardeners and terminates at a PR,
+corroborated no-change, or blocker. Merge and external review remain outside the
+run.
+
+#### General Code Reviewer — internal authoring role
+
+`agents/general-code-reviewer.md` consolidates the local cleanup and
+review work that would otherwise be spread across cleaner/architect passes. It
+reviews correctness, edge and failure paths, simplicity, duplication, types,
+local module boundaries, testability, and test quality; fixes concrete issues;
+runs the declared checks; reviews the result again; and loops while measurable
+progress is being made. It may modify production and tests inside approved
+scope, but it cannot change truth, authority, thresholds, exclusions, policy,
+or scope. Its terminal is `CODE_HARDENED` or a named upstream blocker — never
+external approval.
+
+For a `NO_CHANGE_CANDIDATE`, the same agent runs in non-authoring corroboration
+mode and tries to break the no-op claim. Mutation is not applicable to an empty
+diff.
+
+#### Mutation Hardener — internal authoring role
+
+`agents/mutation-hardener.md` is adapted from the focused hardener role
+used in SwarmForge: differential language mutation, one file/target at a time,
+progress-visible runs, separate property/fuzz commands, then CRAP/DRY and full
+verification. It may alter production and tests where a surviving mutant
+reveals a correctness, design, observability, or testability problem.
+
+The default eligible-target completion contract is:
+
+```text
+line coverage = 100%
+branch coverage = 100%
+mutant resolution = 100%
+actionable surviving mutants = 0
 ```
 
-**Why mode adapters over one flagged skill** (historical note: the method began as two monolithic skills; the shared protocol + three thin adapters replaced them)
+A mutant is resolved only when killed by relevant evidence or recorded as an
+equivalent/tooling-limitation candidate with concrete proof for Owner and
+external review. The Hardener cannot approve its own exception, hand-edit tool
+manifests, lower thresholds, add exclusions, weaken tests, or alter specs and
+oracles. Repository-pinned tools and commands are authoritative; missing
+load-bearing tooling is a named blocker.
 
-The modes have fundamentally different gate providers (human in-session vs GitHub-mediated vs mechanical-or-abort), which is exactly why they are **thin adapters over one extracted machine** — the pain appeared, the extraction happened: `.claude/protocols/implementation-protocol.md` is the shared state machine, and each adapter declares only who satisfies each gate. Duplication between modes is now a validator violation, not an accepted trade.
+#### External reviews
 
-### The reviewer agent and review-criteria skills
+Spec/conformance, constitution/domain, security, performance, systemic
+architecture, compliance, and any independent General Code Review are outside
+the implementation skills. They run through the repository's review API/tool,
+CI pipeline, orchestrator, periodic audit, or human process. The internal agents
+produce a hardened candidate; they do not claim those external reviews happened.
+The orchestrator fingerprints external reports by candidate SHA and re-engages
+the owning worker when a report blocks.
 
-Code review (protocol Phase 8) and the plan gate (protocol Phase 3) are not inlined in the implementation skills — they dispatch a separate **`reviewer` agent** that runs in isolated context and did **not** write the work under review. That context separation is the point — decorrelation, not independent proof: a fresh context doesn't share the author's blind spots. The reviewer reports findings (`[BLOCKER]`/`[SHOULD]`/`[NIT]`); it never edits.
-
-The reviewer is a **router**: it carries no criteria of its own. The criteria live in modular review-criteria skills, and the reviewer loads the ones that fit what it's handed:
-
-- **`plan-review`** — approach soundness for a plan: traced against failure modes, fit with existing code, capability boundaries respected, load-bearing decisions pinned (the deferred-detail-vs-decision test).
-- **`general-code-review`** — the default for any diff: correctness, simplicity/reuse, test quality, type design.
-- **`constitution-compliance-review`** — added when the diff touches a domain rule, a calculation, a sensitive numeric value, the audit trail, source attribution, stage boundaries, or past-period rules. Checks against `architecture/constitution.md` (precise numeric type, audit trail, normative-source citation, responsibility separation, immutability of past rules).
-- **`conformance-review`** — added when the diff implements a spec or an approved plan: does the code do what the spec requires (value by value) and what the plan committed to (intent vs implementation)?
-
-The implementation skills only say "dispatch the `reviewer` with this plan/diff" — the reviewer decides which criteria apply from what the diff touches. On large diffs (roughly >400 changed lines or >10 files) the caller instead dispatches three parallel single-lens reviewers — the reviewer supports a pinned single-lens mode — and merges the reports; the plan gate is never parallelized. Review can also be invoked on demand via `/review`. Adding a dimension later (e.g. a security review) is one new SKILL.md plus one routing line in the reviewer; the implementation skills don't change. The reviewer agent lives in `.claude/agents/`, the criteria skills in `.claude/skills/`.
-
-**Generic vs contextual criteria — and external reviewers.** The criteria split in two. `general-code-review` is *generic*: correctness, simplicity, types, test quality — verifiable without knowing this project. `constitution-compliance-review` and `conformance-review` are *contextual*: checkable only by an agent that reads this project's constitution and specs, which no off-the-shelf tool has. This split is where an **external code reviewer** fits — a SaaS LLM review tool running on the PR can complement the *generic* layer with a reviewer of different architecture than Claude, which catches a largely disjoint set of bugs (the heterogeneity that parallel-reviewer studies show matters). It does **not** replace the contextual reviewer, and it is **advisory, not a gate**: in autonomous mode it stays out of the `/goal` completion condition, because a generic reviewer's middling precision would abort the loop on false positives. What blocks stays deterministic (tests, lint, types) plus the contextual reviewer; the external reviewer comments for the human who owns the merge. Security likewise stays a deterministic gate (SAST/SCA/secret scanning) — an external reviewer informs, it does not certify. Before trusting any external reviewer, run it advisory on this codebase and measure its real false-positive rate in the domain, since benchmark numbers are mode- and dataset-specific and rarely match your code.
+`ticket-readiness-review` remains in the bundle because it validates issue
+contracts before implementation; it is not a code-review agent.
 
 ### Control classification: feedforward/feedback × computational/inferential
 
 A lens (from ThoughtWorks) for auditing the controls above: every control is either **feedforward** (a guide applied *before* the agent acts) or **feedback** (a sensor applied *after*), and either **computational** (deterministic, runs in milliseconds) or **inferential** (an LLM, runs in seconds, catches what code analysis can't). The four quadrants, with this system's controls in each:
 
-- **Feedforward · computational** (deterministic guides): the type system (Decimal not float), ADRs, `.claude/rules/` with `paths:`.
-- **Feedforward · inferential** (LLM/prose guides): the specs, the constitution, the AGENTS.md/CLAUDE.md files, the approved plan (protocol Phase 3).
+- **Feedforward · computational** (deterministic guides): the type system (Decimal not float), ADRs, `.agents/rules/` with `paths:`.
+- **Feedforward · inferential** (LLM/prose guides): the specs, the constitution, the AGENTS.md files, the approved plan (protocol Phase 3).
 - **Feedback · computational** (deterministic sensors): tests, lint, coverage, mutation testing, golden datasets, contract tests, CI.
-- **Feedback · inferential** (LLM sensors): the reviewer (general + constitution-compliance + conformance) and any external advisory reviewer.
+- **Feedback · inferential** (LLM sensors): the two internal authoring hardeners, followed by external report-only reviewers bound to the final candidate.
 
-Two things this lens makes visible. First, all four quadrants are filled — most teams have strong feedback and weak feedforward (more sensors than guides), and the spec-anchored approach is what loads the feedforward side here. Second, the two axes aren't interchangeable: feedback-only means repeated mistakes (no guide stops them up front), feedforward-only means you never confirm the guides worked (no sensor checks the result). The layering follows the cost gradient — computational before inferential (fast/cheap/deterministic first, slow/expensive/semantic second), the same gradient the Phase 3→4→5 sequence already encodes.
+Two things this lens makes visible. First, all four quadrants are filled — most teams have strong feedback and weak feedforward (more sensors than guides), and the spec-anchored approach is what loads the feedforward side here. Second, the two axes aren't interchangeable: feedback-only means repeated mistakes (no guide stops them up front), feedforward-only means you never confirm the guides worked (no sensor checks the result). The layering follows the cost gradient — computational before inferential (fast/cheap/deterministic first, slow/expensive/semantic second), the same gradient the deterministic verification → hardening → external review sequence encodes.
 
 ---
 
@@ -822,7 +664,7 @@ The `stage:` and `area:` values derive from your capabilities — replace the pl
         ↓
 [PR merged → issue closes automatically]
         ↓
-[lessons update the corresponding AGENTS.md/CLAUDE.md, if any]
+[lessons update the corresponding AGENTS.md, if any]
 ```
 
 ### Killed issues
@@ -833,7 +675,7 @@ When closing a `someday` issue by conscious decision: comment with the reason, c
 
 **Daily (5 min, morning before coding):** look at the 3 `priority:now` issues; if one got abstract, open Plan Mode before touching it; if it already has a PR, continue.
 
-**Weekly triage (30 min, fixed day/time):** filter issues without priority created during the week; each becomes `now`, `next`, `someday`, or `closed: not planned`. 2-3 minutes per issue. For the issue those 2-3 minutes can't decide — ambiguous scope, unclear size — run `/plan-from-issue`: the phased plan and its open questions inform the call, and are the cheap `needs-refinement` check before labeling an issue for the autonomous route.
+**Weekly triage (30 min, fixed day/time):** filter issues without priority created during the week; each becomes `now`, `next`, `someday`, or `closed: not planned`. 2-3 minutes per issue. For the issue those 2-3 minutes can't decide — ambiguous scope, unclear size — run `plan-from-issue`: the phased plan and its open questions inform the call, and are the cheap `needs-refinement` check before labeling an issue for the autonomous route.
 
 **Monthly review (45 min):** go through `someday`; kill what no longer makes sense; promote what became obvious; reorganize labels that became a mess.
 
@@ -843,38 +685,38 @@ Starting a feature:
 
 1. Open the repository, look at `priority:now` issues.
 2. Pick one. Read comments. Check whether it got abstract.
-3. Open Claude Code in the affected capability's directory.
+3. Open the selected coding harness in the affected capability's directory when practical.
 4. Decide: simple change, large feature, or new capability?
    - **Simple:** straight to Plan Mode with the issue as context.
-   - **Large feature in an existing capability:** `/shape` interrogates against the existing spec and `/to-spec` writes the delta; merge it at the gate first (human approval — the rules land in the capability spec), then `/spec-to-tickets` and implement from the frontier.
-   - **New capability:** run `/shape` → `/to-spec` to create its spec, `/spec-to-tickets` to break it into issues, then implement from the frontier.
+   - **Large feature in an existing capability:** `shape` interrogates against the existing spec and `to-spec` writes the delta; merge it at the gate first (human approval — the rules land in the capability spec), then `spec-to-tickets` and implement from the frontier.
+   - **New capability:** run `shape` → `to-spec` to create its spec, `spec-to-tickets` to break it into issues, then implement from the frontier.
 
-   For the last two cases — anything with acceptance criteria — invoke the adapter directly (`/implement-feature …`): the protocol's own gates hold the run to evidence. A `/goal` wrapper is an optional, eval-gated composition (Part 3), never the loader. Plain Plan Mode remains right for the simple case.
+   For the last two cases — anything with acceptance criteria — invoke the explicit `implement-feature` skill using the current runtime syntax: the protocol's own gates hold the run to evidence. A `/goal` wrapper is an optional, eval-gated composition (Part 3), never the loader. Plain Plan Mode remains right for the simple case.
 5. Named branch: `<stage>/<sub-area>/<issue-number>-<short-slug>`. E.g.: `<stage>/<sub-area>/142-<short-description>`.
 
 Plan Mode → Execution:
 
-1. Plan Mode (Shift+Tab twice).
-2. Claude reads the capability's AGENTS.md/CLAUDE.md (auto), the root one (auto), the `.claude/rules/` (auto), and docs referenced via `@`.
+1. Enter the runtime's planning mode or equivalent read-only planning phase.
+2. The Owner confirms the effective root/capability `AGENTS.md`, then explicitly reads every applicable `.agents/rules/` file and referenced contract before planning.
 3. You iterate on the plan until it's good (1-6 times, usually).
 4. Check "Unresolved questions" — answer them before proceeding.
 5. Accept the plan, exit Plan Mode.
-6. Auto-accept edits for implementation if confidence is high. Manual when there's risk.
+6. Approve implementation edits according to repository risk and sandbox policy; never let convenience bypass the two human gates.
 
 Closing a feature:
 
 1. Tests passing locally. Lint passing.
 2. Open a PR referencing the issue (`Fixes #142`).
 3. Before merging, a mental checklist:
-   - Did this feature teach something that deserves to be in some capability's AGENTS.md/CLAUDE.md?
-   - Did a violated principle deserve to become a rule in `.claude/rules/`?
+   - Did this feature teach something that deserves to be in some capability's AGENTS.md?
+   - Did a violated principle deserve to become a rule in `.agents/rules/`?
    - Does some architectural decision deserve an ADR in `architecture/decisions/`?
 4. If so, the updates go **in the same PR**. Don't leave it for later.
 5. Merge. The issue closes automatically.
 
 ### Nightly routine (conservative version)
 
-Runs on Anthropic's cloud infra. Pro plan: 5 runs/day.
+This is an optional runtime-specific example. Adapt the schedule and execution surface to the installed harness.
 
 ```
 Groom the issues in the [your-repo] repository.
@@ -937,19 +779,19 @@ New capabilities, new sub-areas, large features that reorganize the pipeline, ar
 
 ### What NOT to do
 
-AGENTS.md/CLAUDE.md:
+AGENTS.md:
 
 - ❌ Auto-generate with `/init` and leave it as-is. It's too high a leverage point.
 - ❌ Put detailed code-style rules. Use a linter/formatter.
-- ❌ Root AGENTS.md/CLAUDE.md over 100 lines.
-- ❌ Repeat information between the root AGENTS.md/CLAUDE.md and the capability ones. Use references.
-- ❌ Use it for security- or correctness-critical things. AGENTS.md/CLAUDE.md has ~70% adherence; hooks are deterministic within their matcher, and the CI state check closes the rest.
+- ❌ Let root AGENTS.md become an unbounded manual.
+- ❌ Repeat information between the root AGENTS.md and the capability ones. Use references.
+- ❌ Treat AGENTS.md as a security or correctness enforcement boundary. Use deterministic checks, permissions, and final-state CI.
 
 Specs:
 
 - ❌ Write a spec for a 30-minute task.
 - ❌ A top-down 200-line PRD before any feature.
-- ❌ A spec that duplicates what's already in the capability's AGENTS.md/CLAUDE.md.
+- ❌ A spec that duplicates what's already in the capability's AGENTS.md.
 - ❌ Skip AskUserQuestion because "I already know the answer."
 
 Backlog:
@@ -962,8 +804,8 @@ Backlog:
 Workflow and autonomy:
 
 - ❌ Exit Plan Mode before reviewing "Unresolved questions."
-- ❌ Update AGENTS.md/CLAUDE.md "later." Do it in the same PR or don't do it.
-- ❌ Run 5 parallel Claude Code sessions without solid practice in 1-2.
+- ❌ Update AGENTS.md "later." Do it in the same PR or don't do it.
+- ❌ Run 5 parallel agent sessions without solid practice in 1-2.
 - ❌ Adopt a framework (Spec Kit, BMAD, Taskmaster) because you feel a lack of "structure." Structure without a concrete problem becomes an abandoned system.
 - ❌ Wait for a "complete" eval suite before starting. 20 tasks are worth more than 0 (see `EVALS.md`).
 - ❌ Trust pass@1 for an agent that opens a PR on its own. You need pass^k.
@@ -971,14 +813,14 @@ Workflow and autonomy:
 
 ### Warning signs
 
-- **Root AGENTS.md/CLAUDE.md passed 80 lines:** it's accumulating junk. Review it.
+- **Root AGENTS.md keeps growing without a new cross-task obligation:** it's accumulating junk. Review it.
 - **`priority:now` is always at 3+ issues:** you're not closing, you're stacking.
-- **Same fix applied to Claude 3x:** make it a rule in `.claude/rules/` or a hook.
+- **Same fix applied by agents repeatedly:** make it a rule in `.agents/rules/` or a hook.
 - **Specs go stale after features:** you're skipping the PR checklist.
 - **You opened spec-kit, BMAD, or similar in your bookmarks:** ask what concrete problem. If there's none, ignore it.
 - **You haven't updated this document in 3+ months:** either it's perfect (unlikely) or it's obsolete (likely).
-- **Dex's heuristic:** open Claude Code in a fresh clone of the repo and say "run the tests." If it doesn't work first try, the AGENTS.md/CLAUDE.md is incomplete — it's missing an essential setup, build, or test command.
-- **You're building an elaborate workflow for a simple task:** vanilla Claude Code is usually better than a custom workflow for small tasks.
+- **Dex's heuristic:** open the default coding harness in a fresh clone and say "run the tests." If it doesn't work first try, the AGENTS.md is incomplete — it's missing an essential setup, build, or test command.
+- **You're building an elaborate workflow for a simple task:** the harness's default coding flow is usually better than a custom workflow for trivial tasks.
 - **The regression suite's pass^3 dropped:** something broke. Stop changes, investigate (see `EVALS.md`).
 - **Average cost per issue rising without a pass^k gain:** silent regression. Investigate.
 - **You created a capability the business doesn't recognize:** speculative structure rots. A capability is justified either by the business (payments exists because you charge people — a known business capability is already justified, see Stage 0) or by divergent rules ("this part needs different rules from the rest") — never by "I thought it'd organize better." An invented one waits in the backlog until evidence shows up.
@@ -987,11 +829,11 @@ Workflow and autonomy:
 ### Honest checks (re-read quarterly)
 
 1. **Am I following the weekly triage?** If not, the whole system collapses. Focus on only that until you're back in rhythm.
-2. **Are the AGENTS.md/CLAUDE.md files still small and current?** If they grew, it's accumulating. If they went stale, you're not closing the loop at the PR.
+2. **Are the AGENTS.md files still small and current?** If they grew, it's accumulating. If they went stale, you're not closing the loop at the PR.
 3. **Do the specs reflect the code?** If not, either abandon the specs or resume the discipline. Both paths are honest. The bad one is keeping a lying spec.
 4. **If autonomy widened beyond the narrow start: is the regression suite running, green, and consulted?** Widening without it is faith; a suite nobody runs is turning into a museum (`AUTONOMY-PLAYBOOK.md`). Running it is part of the work, not a bonus.
 5. **Is the layout still package-by-feature — or drifting toward package-by-entity?** Run the deterministic pass: co-change analysis on git history plus a dependency-graph check (`dependency-cruiser`, ArchUnit). Edits that consistently cross capability folders, or one folder most of the codebase imports from, mean a leaked boundary or a disguised entity — redraw the boundary (Stage 0 signals) instead of adding rules.
-6. **Are the specs still telling the truth about the code?** Run `/review-spec-drift` on the capabilities touched most this quarter. Critical drift is a bug to fix now; cosmetic drift is a spec update to make now — a spec that lies is worse than no spec.
+6. **Are the specs still telling the truth about the code?** Run `review-spec-drift` on the capabilities touched most this quarter. Critical drift is a bug to fix now; cosmetic drift is a spec update to make now — a spec that lies is worse than no spec.
 
 If all are "yes," the system is working. If any is "no," treat it as a bug — not as inevitable.
 
@@ -1003,7 +845,7 @@ An order that makes sense. You don't need to do everything at once.
 
 ### Stage 0 — Identifying capabilities
 
-Before any production code. There's no mechanical checklist — it's a discussion with Claude until consensus:
+Before production code, hold a lightweight human-led architecture discussion with the active agent until the initial boundaries are explainable:
 
 - [ ] Dedicated session (Plan Mode) for identifying capabilities
 - [ ] Note which capabilities are central vs supporting (helps prioritize what to specify first)
@@ -1023,7 +865,7 @@ Done when you can explain to another person what each capability does and doesn'
 ### Entering development + operational base — Week 1-2
 
 - [ ] Set up the folder structure (Part 2) according to the capability map
-- [ ] Write the root `AGENTS.md/CLAUDE.md` following the template
+- [ ] Customize the shipped root `AGENTS.md` with real commands, contract pointers, and rule-routing decisions
 - [ ] Write `architecture/constitution.md`
 - [ ] Write `architecture/pipeline.md` or equivalent (contracts between capabilities)
 - [ ] Configure labels in GitHub Issues per the schema
@@ -1031,30 +873,30 @@ Done when you can explain to another person what each capability does and doesn'
 
 ### Solid operational base — Week 2-4
 
-- [ ] Create a `AGENTS.md/CLAUDE.md` per capability (start with the highest-dependency ones)
-- [ ] Create `.claude/rules/` with 3-5 invariant rules
+- [ ] Create a `AGENTS.md` per capability (start with the highest-dependency ones)
+- [ ] Adopt the shipped `.agents/rules/` and add repository-specific rules only for recurrent, material failures
 - [ ] Migrate existing specs to the template format
 - [ ] Add `contracts/` in at least one capability (suggestion: parsers, which affects the others)
-- [ ] Customize the shipped slash commands to your project (label schema in `/plan-from-issue`; paths, if your layout differs)
+- [ ] Customize the shipped `.agents/skills/` for repository commands, labels, scopes, and runtime adapters
 - [ ] Identify 10-15 representative closed issues that will seed the future regression suite (see `EVALS.md`)
 
 ### Initial automation + narrow-start autonomy — Month 2
 
-- [ ] Configure the Claude Code GitHub Action (`@claude` on issues)
+- [ ] Configure the chosen repository launcher (GitHub Action, manual invocation, or equivalent)
 - [ ] Create the nightly grooming routine (conservative version)
 - [ ] Establish rituals (daily, weekly triage, monthly review) with a fixed time
-- [ ] Practice the Plan Mode → execution flow for 4 complete features before changing the process
+- [ ] Practice the supervised Owner → General Code Reviewer → Mutation Hardener flow on representative issues before widening
 - [ ] Consider turning on **narrow-start autonomy** (hard-coded allowlist + CI green mandatory + human approving every PR — Part 5)
 - [ ] **Start the eval suite:** a minimal manual regression suite with 10-15 tasks (this becomes your `EVALS.md`) — required to *widen* later
-- [ ] **Promote `decimal-handling` (or your domain's equivalent critical rule) from a rule to a hook** (a rule has ~70% adherence; a hook has 100%, and in code where a mistake is costly that matters)
+- [ ] **Mechanize critical rules** with deterministic validation and a required CI gate; use hooks only for fast feedback where the runtime supports them
 
 ### Refinement + widening — Month 3+
 
 - [ ] Add `contracts/` to the remaining capabilities
-- [ ] Run `/review-spec-drift` on the capabilities implemented so far — treat critical drift as a bug
+- [ ] Run `review-spec-drift` on the capabilities implemented so far — treat critical drift as a bug
 - [ ] Evaluate whether Background mode is worth it for long refactors
 - [ ] Evaluate whether Task Budgets make sense for large features
-- [ ] Consider the first Skill — probably a validator of your domain against a reference dataset
+- [ ] Add new skills only when repeated runs show a stable workflow not already covered
 - [ ] **Complete the regression suite** (30+ tasks, pass^3 baseline, production metrics tracked for 30+ days) — the widening prerequisite (`AUTONOMY-PLAYBOOK.md`, Milestone 1)
 - [ ] Consider **widening** (more classes, Tier 1 in CI — `AUTONOMY-PLAYBOOK.md`, Milestone 2) when the suite is stable
 

@@ -156,12 +156,20 @@ S.section("4 terminal contract")
 PR_OK = {"schema_version": 1, "run_id": "RUN-001", "issue_ref": "org/repo#42",
          "terminal": "PR_READY_AWAITING_HUMAN", "claim_state": "parked",
          "pr_url": "https://github.com/org/repo/pull/7", "head_sha": "e" * 40,
-         "approval_fingerprint": FP0, "review_report_sha256": sa.hash_text("report"),
-         "review_seal_sha256": sa.hash_text("seal")}
+         "approval_fingerprint": FP0,
+         "general_hardening_report_sha256": sa.hash_text("general-hardening"),
+         "mutation_hardening_report_sha256": sa.hash_text("mutation-hardening"),
+         "owner_disposition_sha256": sa.hash_text("owner-disposition")}
 S.clean("a well-formed PR_READY result passes", sa.validate_result, PR_OK)
 S.violations("an unknown terminal is refused", sa.validate_result, {**PR_OK, "terminal": "DONE"})
 S.violations("PR_READY without the approval fingerprint is refused", sa.validate_result,
              {k: v for k, v in PR_OK.items() if k != "approval_fingerprint"})
+S.violations("PR_READY without the general hardening report is refused", sa.validate_result,
+             {k: v for k, v in PR_OK.items() if k != "general_hardening_report_sha256"})
+S.violations("PR_READY without the mutation hardening report is refused", sa.validate_result,
+             {k: v for k, v in PR_OK.items() if k != "mutation_hardening_report_sha256"})
+S.violations("PR_READY without the Owner disposition is refused", sa.validate_result,
+             {k: v for k, v in PR_OK.items() if k != "owner_disposition_sha256"})
 S.violations("PR_READY with a released claim is refused (a claim outlives no terminal)",
              sa.validate_result, {**PR_OK, "claim_state": "released"})
 S.violations("a PR from another repository is refused", sa.validate_result,
@@ -173,9 +181,11 @@ S.violations("a run claiming the merge is refused", sa.validate_result,
 NC_OK = {"schema_version": 1, "run_id": "RUN-002", "issue_ref": "org/repo#43",
          "terminal": "NO_CHANGE_REQUIRED", "claim_state": "released",
          "evidence_target_sha256": sa.hash_text("target"),
-         "review_report_sha256": sa.hash_text("corroboration"),
+         "no_change_corroboration_sha256": sa.hash_text("corroboration"),
          "classification": "ALREADY_SATISFIED", "corroborated": True}
 S.clean("a corroborated no-change passes", sa.validate_result, NC_OK)
+S.violations("NO_CHANGE without its corroboration artifact is refused", sa.validate_result,
+             {k: v for k, v in NC_OK.items() if k != "no_change_corroboration_sha256"})
 S.violations("an uncorroborated candidate is refused as a terminal", sa.validate_result,
              {**NC_OK, "corroborated": False})
 S.violations("UNVERIFIABLE is never promoted to no-change", sa.validate_result,

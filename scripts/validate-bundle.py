@@ -29,7 +29,7 @@ def _clean_env():
     return dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONPYCACHEPREFIX=_PYCACHE)
 
 ROOT = Path(".")
-EXCLUDE_EXACT = {"sources-and-learnings.md", "GUIDELINE-pt-BR.md"}
+EXCLUDE_EXACT = {"REVIEW-FINDINGS.md", "sources-and-learnings.md", "GUIDELINE-pt-BR.md"}
 def corpus_md():
     for p in ROOT.rglob("*.md"):
         parts = set(p.parts)
@@ -39,32 +39,54 @@ def corpus_md():
             continue
         yield p
 
-CMD = list(ROOT.rglob(".claude/commands/*.md")) or list(ROOT.glob("commands/*.md"))
-SKL = (list(ROOT.rglob(".claude/skills/*/SKILL.md"))
-       or list(ROOT.glob("skills/*/SKILL.md"))
-       or list(ROOT.glob("implement-*/SKILL.md"))
-       or list(ROOT.glob("reviewer-system/skills/*/SKILL.md")))
-AGT = (list(ROOT.rglob(".claude/agents/*.md"))
-       or list(ROOT.glob("agents/*.md"))
-       or list(ROOT.glob("reviewer-system/agents/*.md")))
-TRANSACTIONAL = ("implement-feature", "implement-orchestrated", "implement-backlog")
+SKL = sorted((ROOT / ".agents" / "skills").glob("*/SKILL.md"))
+if not SKL:
+    SKL = sorted(ROOT.glob("implement-*/SKILL.md")) + sorted(ROOT.glob("reviewer-system/skills/*/SKILL.md"))
+AGT_MD = sorted(ROOT.glob("agents/*.md"))
+AGT_TOML = sorted(ROOT.glob("agents/*.toml"))
+IMPLEMENTATION_ADAPTERS = ("implement-feature", "implement-orchestrated", "implement-backlog")
+EXPLICIT_SKILLS = {
+    "implement", "implement-feature", "implement-orchestrated", "implement-backlog",
+    "explain", "orchestrate", "plan-from-issue", "prep", "review-spec-drift",
+    "shape", "spec-to-tickets", "to-spec",
+}
+
+ACTUAL_SKILL_NAMES = {f.parent.name for f in SKL}
+for missing in sorted(EXPLICIT_SKILLS - ACTUAL_SKILL_NAMES):
+    err(f".agents/skills/{missing}/SKILL.md: required converted workflow skill is missing")
+
+# The shared skill corpus is runtime-neutral. Slash- and dollar-prefixed
+# invocation examples belong in runtime adaptations, not in canonical skills.
+_runtime_prefixed_skill = re.compile(
+    r"(?<![A-Za-z0-9])(?:/|\$)(?:shape|to-spec|spec-to-tickets|implement|"
+    r"implement-feature|implement-orchestrated|implement-backlog|orchestrate|"
+    r"prep|review-spec-drift|explain|plan-from-issue)\b"
+)
+for f in SKL:
+    hit = _runtime_prefixed_skill.search(f.read_text(encoding="utf-8", errors="ignore"))
+    if hit:
+        err(f"{f}: runtime-specific invocation {hit.group(0)!r} is forbidden in "
+            "the shared skill corpus; use the bare skill name and put syntax in an adapter")
 
 # 1. frontmatter schema + invocation policy.
-#    Frontmatter is REQUIRED for these artifact classes: removing it
-#    wholesale used to pass silently, and `disable-model-invocation`
-#    is part of the safety model, not formatting (eleventh audit, P0-13).
-for f in CMD + SKL + AGT:
+#    Every skill and Markdown agent has a real contract envelope. The former
+#    command entrypoints are explicit shared skills; harness-specific command trees are retired.
+for f in SKL + AGT_MD:
     t = f.read_text(encoding="utf-8", errors="ignore")
     if not t.startswith("---"):
-        err(f"{f}: missing frontmatter — commands, skills and agents must declare it")
+        err(f"{f}: missing frontmatter — skills and Markdown agents must declare it")
+        continue
+    pieces = t.split("---", 2)
+    if len(pieces) < 3:
+        err(f"{f}: frontmatter opens but never closes")
         continue
     try:
-        fm = yaml.safe_load(t.split("---")[1])
+        fm = yaml.safe_load(pieces[1])
     except Exception as e:
         err(f"{f}: frontmatter YAML invalid: {e}"); continue
     if fm is None:
         err(f"{f}: frontmatter is empty or null — an empty envelope removes "
-            "name, description and disable-model-invocation without a trace")
+            "name, description and invocation controls without a trace")
         continue
     if not isinstance(fm, dict):
         err(f"{f}: frontmatter must be a mapping, got {type(fm).__name__}")
@@ -76,26 +98,171 @@ for f in CMD + SKL + AGT:
                      ("disable-model-invocation", bool)):
         if key in fm and fm[key] is not None and not isinstance(fm[key], typ):
             err(f"{f}: {key} is {type(fm[key]).__name__}, must be {typ.__name__}")
-    # required fields per artifact class: an empty frontmatter is a
-    # well-formed envelope with no contract inside (twelfth audit, P1-04)
-    if f in CMD:
-        if not isinstance(fm.get("description"), str) or not fm["description"].strip():
-            err(f"{f}: a command must declare a non-empty description")
+    for field in ("name", "description"):
+        if not isinstance(fm.get(field), str) or not fm[field].strip():
+            err(f"{f}: must declare a non-empty {field}")
     if f in SKL:
-        for field in ("name", "description"):
-            if not isinstance(fm.get(field), str) or not fm[field].strip():
-                err(f"{f}: a skill must declare a non-empty {field}")
-    if f in AGT:
-        if "reviewer" in str(f) and fm.get("isolation") != "worktree":
-            err(f"{f}: the reviewer must declare isolation: worktree "
-                "(candidate immutability is configuration, not prose)")
-        for field in ("name", "description"):
-            if not isinstance(fm.get(field), str) or not fm[field].strip():
-                err(f"{f}: an agent must declare a non-empty {field}")
-    if any(f"{name}/SKILL.md" in str(f) for name in TRANSACTIONAL):
-        if fm.get("disable-model-invocation") is not True:
-            err(f"{f}: transactional adapter must set disable-model-invocation: true "
-                "(user-invocation-only is a contract, not a preference)")
+        expected_name = f.parent.name
+        if fm.get("name") != expected_name:
+            err(f"{f}: skill name {fm.get('name')!r} must match directory {expected_name!r}")
+        if expected_name in EXPLICIT_SKILLS and fm.get("disable-model-invocation") is not True:
+            err(f"{f}: explicit workflow skill must set disable-model-invocation: true")
+    if f in AGT_MD:
+        if fm.get("isolation") != "worktree":
+            err(f"{f}: internal authoring agents must declare isolation: worktree "
+                "so every handoff is a committed, inspectable delta")
+        if fm.get("effort") != "max":
+            err(f"{f}: internal agents must declare effort: max; lower effort is "
+                "not an allowed adapter override")
+        if "model" in fm:
+            err(f"{f}: internal agents must omit model so they inherit the Owner/parent worker model")
+
+# 1a. commands and harness-native agent directories are retired. There is one
+# shared skill corpus and one paired root agent catalog.
+for retired_dir in (
+    ROOT / ".claude/commands", ROOT / ".claude/agents", ROOT / ".claude/protocols",
+    ROOT / ".claude/skills", ROOT / ".claude/rules", ROOT / ".claude/logs",
+):
+    if retired_dir.exists():
+        err(f"{retired_dir}: retired — entrypoints are skills, agent contracts live in "
+            "root agents/, while shared skills/rules/protocols live under .agents/")
+
+# 1a.1 cross-harness operating entrypoint and runtime-state hygiene.
+agents_md = ROOT / "AGENTS.md"
+if not agents_md.exists():
+    err("AGENTS.md: cross-harness operational entrypoint is required")
+else:
+    ag = agents_md.read_text(encoding="utf-8", errors="ignore")
+    for phrase in (".agents/skills/", ".agents/protocols/", ".agents/rules/",
+                   ".agent-runs/<run-id>/", "general-code-reviewer", "mutation-hardener"):
+        if phrase not in ag:
+            err(f"AGENTS.md: missing routing obligation {phrase!r}")
+    if len(ag.splitlines()) > 110:
+        err("AGENTS.md: root operational context must stay concise (<= 110 lines)")
+
+required_rules = {"testing.md", "truth-layer.md", "package-by-feature.md"}
+rules_dir = ROOT / ".agents" / "rules"
+actual_rules = {p.name for p in rules_dir.glob("*.md")} if rules_dir.exists() else set()
+for missing in sorted(required_rules - actual_rules):
+    err(f".agents/rules/{missing}: required shared engineering rule is missing")
+
+ignore = ROOT / ".gitignore"
+if not ignore.exists() or ".agent-runs/" not in ignore.read_text(encoding="utf-8", errors="ignore"):
+    err(".gitignore: must ignore .agent-runs/ so transient run state is never committed")
+if (ROOT / ".agent-runs").exists():
+    err(".agent-runs/: transient run state must not be packaged in the bundle")
+
+for adapter_name in IMPLEMENTATION_ADAPTERS:
+    template = ROOT / ".agents" / "skills" / adapter_name / "references" / "log-template.md"
+    if template.exists() and ".agent-runs/<run-id>/run-log.md" not in template.read_text(encoding="utf-8"):
+        err(f"{template}: runtime log must live under .agent-runs/<run-id>/run-log.md")
+
+# 1b. exactly two authoring agents ship, and each has byte-equivalent Markdown
+# instructions plus a TOML adapter. Heavy/spec/security/performance reviews are external.
+EXPECTED_AGENT_STEMS = {"general-code-reviewer", "mutation-hardener"}
+md_by_stem = {f.stem: f for f in AGT_MD}
+toml_by_stem = {f.stem: f for f in AGT_TOML}
+for extra in sorted(set(md_by_stem) - EXPECTED_AGENT_STEMS):
+    err(f"agents/{extra}.md: only the two internal authoring agents belong in the harness")
+for extra in sorted(set(toml_by_stem) - EXPECTED_AGENT_STEMS):
+    err(f"agents/{extra}.toml: only the two internal authoring agents belong in the harness")
+for missing in sorted(EXPECTED_AGENT_STEMS - set(md_by_stem)):
+    err(f"agents/{missing}.md: required Markdown agent contract is missing")
+for missing in sorted(EXPECTED_AGENT_STEMS - set(toml_by_stem)):
+    err(f"agents/{missing}.toml: required TOML agent contract is missing")
+
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - Python 3.11+ is the supported baseline
+    tomllib = None
+
+for stem in sorted(EXPECTED_AGENT_STEMS & set(md_by_stem) & set(toml_by_stem)):
+    md_path = md_by_stem[stem]
+    toml_path = toml_by_stem[stem]
+    md_text = md_path.read_text(encoding="utf-8", errors="strict")
+    pieces = md_text.split("---", 2)
+    if len(pieces) < 3:
+        continue
+    md_fm = yaml.safe_load(pieces[1]) or {}
+    md_body = pieces[2].lstrip("\n").rstrip() + "\n"
+    if tomllib is None:
+        err(f"{toml_path}: tomllib unavailable")
+        continue
+    try:
+        obj = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        err(f"{toml_path}: invalid TOML ({e})")
+        continue
+    for field in ("name", "description", "developer_instructions"):
+        if not isinstance(obj.get(field), str) or not obj[field].strip():
+            err(f"{toml_path}: missing non-empty {field}")
+    if obj.get("name") != stem or md_fm.get("name") != stem:
+        err(f"agents/{stem}: file stem, Markdown name and TOML name must match")
+    if " ".join(str(md_fm.get("description", "")).split()) != " ".join(str(obj.get("description", "")).split()):
+        err(f"agents/{stem}: Markdown and TOML descriptions drifted")
+    if obj.get("developer_instructions", "").rstrip() + "\n" != md_body:
+        err(f"agents/{stem}: TOML developer_instructions drifted from the Markdown body")
+    if obj.get("sandbox_mode") != "workspace-write":
+        err(f"{toml_path}: authoring agent must use sandbox_mode = workspace-write")
+    if "model" in obj:
+        err(f"{toml_path}: internal agents must omit model so Codex inherits the parent worker model")
+    if obj.get("model_reasoning_effort") != "max":
+        err(f"{toml_path}: internal agents must use model_reasoning_effort = max")
+    if obj.get("source_markdown") != f"agents/{stem}.md":
+        err(f"{toml_path}: source_markdown must point to agents/{stem}.md")
+
+# A native Codex install is generated, never canonical. When present it must be
+# an exact mirror of the root TOML contracts and contain no extra role.
+codex_agents = ROOT / ".codex" / "agents"
+if codex_agents.exists():
+    actual = {p.name for p in codex_agents.glob("*.toml")}
+    expected = {f"{stem}.toml" for stem in EXPECTED_AGENT_STEMS}
+    for extra in sorted(actual - expected):
+        err(f"{codex_agents / extra}: generated Codex agent is not in the canonical root catalog")
+    for missing in sorted(expected - actual):
+        err(f"{codex_agents / missing}: generated Codex agent mirror is missing")
+    for name in sorted(actual & expected):
+        if (codex_agents / name).read_bytes() != (ROOT / "agents" / name).read_bytes():
+            err(f"{codex_agents / name}: generated Codex adapter drifted from agents/{name}")
+
+for retired in (
+    ROOT / "agents/reviewer.md",
+    ROOT / "agents/reviewer.toml",
+    ROOT / ".agents/skills/plan-review",
+    ROOT / ".agents/skills/conformance-review",
+    ROOT / ".agents/skills/constitution-compliance-review",
+):
+    if retired.exists():
+        err(f"{retired}: retired in favor of the two internal authoring agents and external review pipeline")
+
+general_review_skill = ROOT / ".agents/skills/general-code-review/SKILL.md"
+if not general_review_skill.exists():
+    err(f"{general_review_skill}: required rubric for the General Code Reviewer is missing")
+else:
+    gr = general_review_skill.read_text(encoding="utf-8", errors="ignore").lower()
+    for phrase in ("correctness", "regression", "test quality", "owner"):
+        if phrase not in gr:
+            err(f"{general_review_skill}: missing reviewer obligation '{phrase}'")
+    agent_path = ROOT / "agents/general-code-reviewer.md"
+    if agent_path.exists() and "general-code-review" not in agent_path.read_text(encoding="utf-8", errors="ignore"):
+        err(f"{agent_path}: does not load the general-code-review criteria skill")
+
+testing_rule = ROOT / ".agents/rules/testing.md"
+if not testing_rule.exists():
+    err(".agents/rules/testing.md: testing strategy rule is required before mutation hardening")
+else:
+    tr = testing_rule.read_text(encoding="utf-8", errors="ignore").lower()
+    for phrase in ("regression", "integration", "contract", "fuzz", "mutation"):
+        if phrase not in tr:
+            err(f"{testing_rule}: missing testing obligation '{phrase}'")
+
+for adapter_name in IMPLEMENTATION_ADAPTERS:
+    adapter = ROOT / ".agents/skills" / adapter_name / "SKILL.md"
+    if adapter.exists():
+        at = adapter.read_text(encoding="utf-8", errors="ignore")
+        for agent_name in ("general-code-reviewer", "mutation-hardener"):
+            if agent_name not in at:
+                err(f"{adapter}: does not invoke required internal agent {agent_name}")
 
 # 2. retired forms — literal and semantic
 def scan_retired(root, legacy, skip_exact):
@@ -131,7 +298,12 @@ LEGACY = [r"\bPhase 7:", r"two skills, not one", r"monitor until (it )?land",
           # tenth audit: the old generation kept reappearing in prose
           r"autonomous /goal", r"`/goal` condition can verify",
           r"plain `/implement`", r"the implementation skills, the reviewer, `/goal`",
-          r"approved_expansions", r"PLAN-FINGERPRINT"]
+          r"approved_expansions", r"PLAN-FINGERPRINT",
+          # cross-harness migration: shared authority/state never returns to a
+          # product-specific namespace
+          r"\.claude/(?:skills|rules|logs|protocols|commands|agents)/",
+          r"auto-loaded every session",
+          r"one spec per capability", r"from a single spec file"]
 for path, pat in scan_retired(ROOT, LEGACY, EXCLUDE_EXACT):
     err(f"{path}: retired form /{pat}/")
 
@@ -145,20 +317,32 @@ elif tpls:
         if organ not in t:
             err(f"{tpls[0]}: missing organ '{organ}'")
 
-# 4. adapters read the protocol
+# 4. adapters read the exact canonical protocol path.
 for f in SKL:
-    if "implement" in str(f) and "implementation-protocol.md" not in f.read_text(encoding="utf-8"):
-        err(f"{f}: does not reference the shared protocol")
+    if (f.parent.name in IMPLEMENTATION_ADAPTERS and
+            ".agents/protocols/implementation-protocol.md" not in
+            f.read_text(encoding="utf-8")):
+        err(f"{f}: does not reference .agents/protocols/implementation-protocol.md")
 
-# 5. protocol carries the terminal taxonomy
+# 5. one canonical shared protocol tree, neutral to the runtime.
+protocol_path = ROOT / ".agents" / "protocols" / "implementation-protocol.md"
 pp = list(ROOT.rglob("implementation-protocol.md"))
-if not pp:
-    err("shared protocol file not found")
+if pp != [protocol_path]:
+    err(f"expected exactly one shared protocol at {protocol_path}, found: {pp}")
+if not protocol_path.exists():
+    err(f"{protocol_path}: shared protocol file not found")
 else:
-    t = pp[0].read_text(encoding="utf-8")
-    for term in ("NO_CHANGE_REQUIRED", "PR_READY_AWAITING_HUMAN", "NAMED_BLOCKER"):
-        if term not in t:
-            err(f"{pp[0]}: missing terminal {term}")
+    protocol_text = protocol_path.read_text(encoding="utf-8")
+    for term in ("NO_CHANGE_REQUIRED", "PR_READY_AWAITING_HUMAN", "NAMED_BLOCKER",
+                 'model_reasoning_effort="max"', "inherit the model", ".agent-runs/<run-id>/"):
+
+        if term not in protocol_text:
+            err(f"{protocol_path}: missing protocol obligation {term}")
+    if "effort=max" not in protocol_text:
+        err(f"{protocol_path}: must declare effort=max for both internal agents")
+    for ref in ("references/scope-manifest-schema.md", "references/review-target-schema.md"):
+        if not (protocol_path.parent / ref).exists():
+            err(f"{protocol_path.parent / ref}: required shared protocol reference is missing")
 
 # 6. executable contracts must compile and ship with their suites
 CONTRACTS = ROOT / "scripts" / "spec-anchored"
@@ -176,12 +360,11 @@ if CONTRACTS.exists():
     # validator with a syntax error used to pass unnoticed (closure v2, P1-02)
     discovered = sorted({p for p in list(ROOT.rglob("*.py"))
                          if "__pycache__" not in str(p) and ".git" not in str(p)})
-    for src in [CONTRACTS] + discovered + [Path(__file__)]:
-        r = subprocess.run([sys.executable, "-m", "py_compile", str(src)],
-                           capture_output=True, text=True, timeout=60,
-                           env=_clean_env())
-        if r.returncode != 0:
-            err(f"{src}: does not compile — {r.stderr.strip().splitlines()[-1:]}")
+    for src in sorted(set([CONTRACTS] + discovered + [Path(__file__)]), key=str):
+        try:
+            compile(src.read_text(encoding="utf-8"), str(src), "exec")
+        except Exception as e:
+            err(f"{src}: does not compile — {type(e).__name__}: {e}")
 
 # 6b. the policy artifacts and the kernel's profiles must be the SAME policy
 if CONTRACTS.exists() and (ROOT / "policy" / "profiles").is_dir():
@@ -241,7 +424,7 @@ for sh in list(ROOT.rglob("*.sh")):
         err(f"{sh}: shell syntax error — {r.stderr.strip().splitlines()[-1:]}")
 
 # 8. frontmatter must be delimited on BOTH sides
-for f in CMD + SKL + AGT:
+for f in SKL + AGT_MD:
     t = f.read_text(encoding="utf-8", errors="ignore")
     if t.startswith("---") and len(t.split("---")) < 3:
         err(f"{f}: frontmatter opens but never closes (the parser would read the body as YAML)")

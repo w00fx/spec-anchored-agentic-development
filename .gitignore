@@ -1,1 +1,9 @@
-.DS_Store
+# Spec Anchored runtime state is local/CI evidence, never product source.
+.agent-runs/
+
+# Generated runtime adapters; canonical role contracts live under agents/.
+.codex/agents/
+
+# Python/tool caches
+__pycache__/
+*.pyc

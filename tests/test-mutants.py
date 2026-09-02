@@ -67,6 +67,15 @@ MUTANTS = {
     "stop refusing unknown result fields": (
         "    for k in sorted(set(result) - known):",
         "    for k in []:"),
+    "let PR_READY omit the mutation hardening report": (
+        '                     "mutation_hardening_report_sha256",\n                     "owner_disposition_sha256"},',
+        '                     "owner_disposition_sha256"},'),
+    "let PR_READY omit Owner disposition": (
+        '                     "owner_disposition_sha256"},',
+        '                     "owner_disposition_sha256"} - {"owner_disposition_sha256"},'),
+    "let NO_CHANGE omit corroboration identity": (
+        '        "required": {"evidence_target_sha256", "no_change_corroboration_sha256",',
+        '        "required": {"evidence_target_sha256",'),
     # oracle mutants: a clean refusal replaced by a crash must NOT pass
     "crash instead of refusing cleanly (wrong exception type)": (
         '            raise ContractViolation("line %d: unreadable status %r (refusing to treat "',

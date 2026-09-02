@@ -114,14 +114,13 @@ GOVERNANCE_SURFACES = {
                                "tests/_harness.py", "tests/test_kernel*.py",
                                "tests/test_corpus*.py", "tests/test-mutants.py"],
     "policy": ["policy/**"],
-    "agent definitions": [".claude/**", ".agents/**", "agent-system/**",
-                          ".codex/**", "reviewer-system/**", "commands/**",
-                          "protocols/**", "rules/**", "routines/**",
-                          "implement-*/**", "adaptations/**"],
+    "agent definitions": [".claude/**", ".agents/**", "agents/**", ".codex/**", ".cursor/**",
+                          "reviewer-system/**", "protocols/**", "rules/**",
+                          "routines/**", "implement-*/**", "adaptations/**"],
     "CI and automation": [".github/**", ".gitlab-ci.yml", "azure-pipelines.yml"],
     "spec templates": ["spec-templates/**"],
     "doctrine": ["GUIDELINE*.md", "AUTONOMY-PLAYBOOK.md", "INSTALL.md",
-                 "sources-and-learnings.md"],
+                 "REVIEW-FINDINGS.md", "sources-and-learnings.md"],
     # the instructions the run itself is judged under: a run that can
     # edit its own operating context can change the rule and then work
     # under the new one (twelfth audit, P0-03)
@@ -132,6 +131,7 @@ GOVERNANCE_SURFACES = {
                             "**/constitution.md"],
     "eval definitions": ["EVALS*.md", "evals/spec-anchored/**",
                          "eval-results/spec-anchored/**"],
+    "transient run state": [".agent-runs/**"],
 }
 GOVERNANCE_FLOOR = [p for pats in GOVERNANCE_SURFACES.values() for p in pats]
 PROFILES = {
@@ -1110,22 +1110,35 @@ COMMON = {"schema_version", "run_id", "issue_ref", "terminal", "claim_state"}
 BY_TERMINAL = {
     "PR_READY_AWAITING_HUMAN": {
         "required": {"pr_url", "head_sha", "approval_fingerprint",
-                     "review_report_sha256", "review_seal_sha256"},
-        "forbidden": {"blocker_kind", "classification", "evidence_target_sha256",
+                     "general_hardening_report_sha256",
+                     "mutation_hardening_report_sha256",
+                     "owner_disposition_sha256"},
+        "forbidden": {"blocker_kind", "issue_comment_url", "classification",
+                      "evidence_target_sha256", "no_change_corroboration_sha256",
                       "corroborated"},
         "claim": "parked"},
     "NAMED_BLOCKER": {
         "required": {"blocker_kind", "issue_comment_url"},
-        "forbidden": {"pr_url", "review_seal_sha256", "corroborated", "classification"},
+        "forbidden": {"pr_url", "head_sha", "approval_fingerprint",
+                      "general_hardening_report_sha256",
+                      "mutation_hardening_report_sha256",
+                      "owner_disposition_sha256", "classification",
+                      "evidence_target_sha256", "no_change_corroboration_sha256",
+                      "corroborated"},
         "claim": "released"},
     "NO_CHANGE_REQUIRED": {
-        "required": {"evidence_target_sha256", "review_report_sha256",
+        "required": {"evidence_target_sha256", "no_change_corroboration_sha256",
                      "classification", "corroborated"},
-        "forbidden": {"pr_url", "head_sha", "review_seal_sha256", "blocker_kind"},
+        "forbidden": {"pr_url", "head_sha", "approval_fingerprint",
+                      "general_hardening_report_sha256",
+                      "mutation_hardening_report_sha256",
+                      "owner_disposition_sha256", "blocker_kind",
+                      "issue_comment_url"},
         "claim": "released"},
 }
-HASHED = ("approval_fingerprint", "review_report_sha256", "review_seal_sha256",
-          "evidence_target_sha256")
+HASHED = ("approval_fingerprint", "general_hardening_report_sha256",
+          "mutation_hardening_report_sha256", "owner_disposition_sha256",
+          "evidence_target_sha256", "no_change_corroboration_sha256")
 
 
 def validate_result(result):

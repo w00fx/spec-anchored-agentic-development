@@ -2,38 +2,24 @@
 
 This bundle turns a coding agent into the system described in `GUIDELINE.md`
 (English, canonical): capability-organized, spec-anchored development;
-one implementation protocol with three mode adapters, a reviewer agent with
-criteria lenses, an authorization floor, and executable contracts that refuse.
+implementation skills, two internal authoring hardeners, a compact testing rule, and direct skill invocations; runtime completion wrappers are optional and eval-gated, never the engine.
 
-**The bundle folders live at this repository's top level; in your repository
-they go under `.claude/`.** From your repository root:
+Copy `AGENTS.md`, `.agents/`, root `agents/`, `policy/`, `scripts/`, and the
+root-level doctrine/templates your team keeps into the repository root. Shared
+skills, protocols, and rules are already canonical under `.agents/`; Cursor and
+Codex must not write their run state under a product-specific directory.
 
-```bash
-mkdir -p .claude
-cp -R <path-to-bundle>/{protocols,skills,commands,agents,rules,hooks,routines} .claude/
-cp -R <path-to-bundle>/{spec-templates,policy,scripts,tests} .
-cp <path-to-bundle>/{GUIDELINE.md,AUTONOMY-PLAYBOOK.md,EVALS.template.md} .
-```
-
-`spec-templates/`, `policy/`, `scripts/` and `tests/` stay at the top level:
-the template and the policy artifacts are read by humans and by CI, and the
-gate reserves `scripts/**` as a governance surface. A repository whose
-`scripts/` already holds product code installs the harness under
-`.spec-anchored/` instead — see `policy/README.md`.
-
-Two dependency notes. The structural validator needs `pyyaml`
-(`pip install pyyaml`); `scripts/spec-anchored` itself is dependency-free. And
-to invoke the contracts as `spec-anchored <cmd>`, the way the protocol writes
-them, put `scripts/` on your PATH or symlink the file — otherwise call
-`python3 scripts/spec-anchored <cmd>`.
-
-Read `GUIDELINE.md` first; `AUTONOMY-PLAYBOOK.md` when you start widening
-autonomy.
+Run `scripts/install-codex-port.sh` only when you want the generated
+`.codex/agents/` custom-agent adapters. `.claude/` contains optional
+Claude-specific hooks/routines only and is not shared authority. Read
+`GUIDELINE.md` first; read `AUTONOMY-PLAYBOOK.md` when widening autonomy.
 
 ## Where each file goes
 
 | File | What it is |
 |---|---|
+| `AGENTS.md` | Cross-harness operational entrypoint: authority, canonical paths, rule loading, internal-agent sequence, runtime-state policy |
+| `.gitignore` | Keeps `.agent-runs/` and generated Codex adapters out of product commits |
 | `GUIDELINE.md` | The system — read this first |
 | `AUTONOMY-PLAYBOOK.md` | Milestones 1-4, Tier 1/2 metrics, per-class auto-merge |
 | `sources-and-learnings.md` | Source catalog + decision record |
@@ -42,81 +28,71 @@ autonomy.
 | `adaptations/claude-plus-codex.md` | Both harnesses on one repo: layer sharing strategies, division of labor (autonomous route vs cross-family vote), the CI drift gate |
 | `CLAUDE-codebase-exploration-block.md` | Paste into your root CLAUDE.md (example tool stack — swap in yours) |
 | `spec-templates/capability-spec.md` | The permanent capability-spec template (EARS + GWT + reference values) |
-| `.claude/skills/implement-feature/SKILL.md` | Supervised-local adapter of the shared protocol (phases 0–9; human satisfies every gate in-session; gated semantic amendment per the truth-change policy) |
-| `.claude/skills/implement-feature/references/log-template.md` | Log schema for the skill's runs (read when opening the run log) |
-| `.claude/skills/implement-backlog/SKILL.md` | Unattended adapter (mechanical-or-abort gates; invoked directly — launcher's `claude -p` or routine child session; terminal = PR_READY_AWAITING_HUMAN, never merge-monitoring) |
-| `.claude/skills/implement-backlog/references/log-template.md` | Log schema for autonomous runs (read when opening the run log) |
-| `.claude/skills/implement-backlog/references/rationalizations.md` | The shortcuts that turn an unattended run into a discarded PR — read when the run is tempted to skip a gate |
-| `.claude/skills/implement-backlog/references/pr-template.md` | Shared PR description template, all adapters (Approved plan + fingerprint; terminal = PR_READY_AWAITING_HUMAN — monitoring lives outside the run) |
-| `scripts/check-all.sh` | **The single gate — CI runs this.** Compiles the contracts, runs the structural validator, the contract suite, the adversarial suite, and the Codex port drift check |
+| `.agents/skills/implement-feature/SKILL.md` | Supervised-local adapter of the shared protocol (phases 0–10; human satisfies every gate in-session; gated semantic amendment per the truth-change policy) |
+| `.agents/skills/implement-feature/references/log-template.md` | Log schema for the skill's runs (read when opening the run log) |
+| `.agents/skills/implement-backlog/SKILL.md` | Unattended adapter (mechanical-or-abort gates; invoked directly — the installed launcher or runtime child session; terminal = PR_READY_AWAITING_HUMAN, never merge-monitoring) |
+| `.agents/skills/implement-backlog/references/log-template.md` | Log schema for autonomous runs (read when opening the run log) |
+| `.agents/skills/implement-backlog/references/pr-template.md` | Shared PR description template, all adapters (Approved plan + fingerprint; terminal = PR_READY_AWAITING_HUMAN — monitoring lives outside the run) |
+| `scripts/check-all.sh` | **The single gate — CI runs this.** Compiles the contracts, runs the structural validator, fast contract/adversarial suites, slow corpus fixtures, mutation adequacy, and the Codex port drift check when the generated port is installed |
 | `scripts/spec-anchored` | **Executable contracts** (dependency-free, fail-closed): `canonicalize`, `build-approval` + `verify-approval` (APPROVAL-FINGERPRINT over the canonical bundle; the record proves the approval *event*), `validate-scope` (schema-valid manifest, absolute deny, typed truth grants, permissions, NUL-safe parser), `validate-result` (strict terminal union). `python3 scripts/spec-anchored <cmd>` |
 | `policy/profiles/` | **The authorization floors** — four versioned base profiles. For autonomous and unattended modes a base profile is *not executable*: it constrains form, never surface |
 | `policy/instances/` | **What a launcher actually issues** — base + overlay carrying `authorized_scope_roots`, aggregate caps, path denies and operations. Every path-bearing field is canonically validated, and the structural gate strict-parses and resolves every artifact here |
 | `scripts/run-step.py` | Portable per-step timeout for the gate (exit 124), so the budget is real without depending on a `timeout(1)` binary |
 | `tests/_harness.py` | Test harness with **explicit outcome protocols** (`raises` / `violations` / `clean` / `value` / `holds`). `raises` demands the kernel's own `ContractViolation`: a crash of any other type is a programming failure, not a refusal |
-| `tests/test_kernel_contracts.py` | 61 fast in-process checks — canonicalization, the approval mutation matrix, scope under a policy floor, the terminal union |
-| `tests/test_kernel_adversarial.py` | 202 fast adversarial fixtures — every bypass audits nine through eleven found: denied-path-as-truth, oracle-inside-specs, permission evasion, self-authorization, governance-surface writes, cross-run and cross-repo approval replay, impossible calendar dates, padded diff paths, fake terminals |
-| `tests/test_corpus.py` | 45 slow corpus fixtures (retired forms, hidden files, broken CLI, broken shell, unterminated frontmatter) — run **once** by the gate, never per mutant |
-| `tests/test-mutants.py` | **Mutation adequacy** — injects 52 regressions into the kernel and requires a fixture to catch each, running only the fast suites. A survivor is named. The whole gate finishes in seconds |
+| `tests/test_kernel_contracts.py` | 65 fast in-process checks — canonicalization, the approval mutation matrix, scope under a policy floor, the terminal union |
+| `tests/test_kernel_adversarial.py` | 208 fast adversarial fixtures — every bypass audits nine through eleven found: denied-path-as-truth, oracle-inside-specs, permission evasion, self-authorization, governance-surface writes, cross-run and cross-repo approval replay, impossible calendar dates, padded diff paths, fake terminals |
+| `tests/test_corpus.py` | slow corpus fixtures (retired forms, hidden files, broken CLI, broken shell, unterminated frontmatter) — run **once** by the gate, never per mutant |
+| `tests/test-mutants.py` | **Mutation adequacy** — injects 55 regressions into the kernel and requires a fixture to catch each, running only the fast suites. A survivor is named. The mutation stage uses only the fast suites; the full gate also contains the intentionally slower corpus stage |
 | `scripts/validate-bundle.py` | Structural gate ONLY (corpus scan including hidden dirs, frontmatter policy, retired forms, py_compile, `bash -n`). It never runs the suites — mixing those roles is what let an env var skip the tests |
-| `scripts/install-codex-port.sh` | Experimental Codex coexistence materializer — invoke as `bash scripts/install-codex-port.sh`; qualify before trusting (EVAL-018) |
-| `EVALS.template.md` | Eval-case schema + the 21-case initial index (deduplicated); copy to `EVALS.md` when qualifying |
-| `.claude/protocols/references/scope-manifest-schema.md` | The run's mechanical-scope proposal (allowed/denied paths, permissions, typed truth grants) — a subset of the policy floor, hashed into the approval bundle |
-| `.claude/protocols/references/review-target-schema.md` | Seal schemas (review target + report + invalidation check) — staged enforcement |
-| `.claude/protocols/implementation-protocol.md` | The shared implementation state machine — phases, terminals, gates; every implement skill is a mode adapter over it |
-| `.claude/skills/implement-orchestrated/SKILL.md` | Orchestrated-worker adapter: first-message invocation, GitHub-satisfied gates, plan fingerprint, self-checks, parked delivery |
-| `.claude/agents/reviewer.md` | The reviewer subagent (fresh context; report-only **by instruction** — Bash present for verify commands; the enforceable invariant is candidate-immutability (disposable checkout, no push/commit credentials, tracked tree clean before and after); loads criteria lenses per its routing table) |
-| `.claude/skills/plan-review/SKILL.md` | Lens: approach soundness before code |
-| `.claude/skills/general-code-review/SKILL.md` | Lens: correctness, simplicity, tests, types, commits |
-| `.claude/skills/general-code-review/references/test-standards.md` | Shared test bar (GOOD/BAD pairs + mocking boundary rule) — the lens judges by it, both implement skills write to it |
-| `.claude/skills/general-code-review/references/smell-baseline.md` | Twelve Fowler smells with fixes (repo overrides; capped at [SHOULD]) |
-| `.claude/skills/constitution-compliance-review/SKILL.md` | Lens: domain invariants vs `architecture/constitution.md` |
-| `.claude/skills/conformance-review/SKILL.md` | Lens: diff vs spec (value by value) and vs the approved plan |
-| `.claude/skills/ticket-readiness-review/SKILL.md` | Lens: tickets as executable contracts — self-contained, criteria pointed, graph explicit, sized; gates dispatch |
-| `.claude/commands/implement.md` | Discoverability **redirect only** → points at `/implement-feature` (a command body cannot load a user-only skill) |
-| `.claude/commands/review.md` | On-demand reviewer dispatch (report-only) |
-| `.claude/commands/explain.md` | Post-implementation walkthrough → `docs/walkthroughs/` |
-| `.claude/commands/shape.md` | Work-shaping interview (idea / transcript / code / existing spec / task) — the interview only; `/to-spec` writes |
-| `.claude/commands/to-spec.md` | Writes/updates the capability spec from the interview (never asks back; typed stable IDs issued in continuation) |
-| `.claude/commands/prep.md` | One-time repo prep: the three-command interface, metric-class gates (stack-agnostic), golden skeleton, minimum CI, ratchet baseline — brownfield-safe |
-| `.claude/commands/orchestrate.md` | Wave orchestration over the explicit issue graph: wave table → workers in child worktrees off fresh main → fingerprinted CI+review monitor → triage + the applicable lenses → human merges gate waves |
-| `.claude/commands/spec-to-tickets.md` | Spec → tracer-bullet tickets with blocking edges (quiz before publish; tickets.md or GitHub Issues) |
-| `.claude/commands/plan-from-issue.md` | Phased plan from a GitHub issue (Plan Mode; no implementation) |
-| `.claude/commands/review-spec-drift.md` | Periodic whole-capability spec ↔ code drift audit (report-only) |
-| `.claude/rules/package-by-feature.md` | Always-loaded rule: capability-vs-entity tests at file-creation time |
-| `.claude/rules/truth-layer.md` | Always-loaded rule: specs/tables/golden/baseline read-only outside the named flows; typed-branch + evidence floor |
+| `scripts/install-codex-port.sh` | Validates the canonical shared corpus and materializes only the disposable `.codex/agents/` adapters; `.agents/skills/` is already native/canonical |
+| `EVALS.template.md` | Eval-case schema + authority/lifecycle, two-agent hardening, and external-review integration cases; copy to `EVALS.md` when qualifying |
+| `.agents/protocols/references/review-target-schema.md` | Exact candidate, authoring-agent handoff, Owner disposition, and external review identity schemas |
+| `.agents/protocols/implementation-protocol.md` | The shared implementation state machine — phases, terminals, gates; every implement skill is a mode adapter over it |
+| `.agent-runs/<run-id>/` | Gitignored per-run state, logs, approvals, evidence, hardening handoffs, Owner dispositions, final candidate and result; created at runtime, never packaged |
+| `.agents/skills/implement-orchestrated/SKILL.md` | Orchestrated-worker adapter: first-message invocation, GitHub-satisfied gates, plan fingerprint, self-checks, parked delivery |
+| `agents/general-code-reviewer.md` | Canonical Markdown role contract for the internal authoring reviewer/cleaner; suitable for Cursor and external loaders |
+| `agents/general-code-reviewer.toml` | Equivalent TOML role contract for Codex and TOML-based loaders; validator enforces body parity with the Markdown file |
+| `.agents/skills/general-code-review/SKILL.md` | Detailed correctness/simplicity/types/test-quality rubric loaded by the internal General Code Reviewer |
+| `.agents/skills/general-code-review/references/test-standards.md` | Behavior-first testing and mocking-boundary reference used by the General Code Reviewer |
+| `.agents/skills/general-code-review/references/smell-baseline.md` | Structural-smell vocabulary used as a heuristic, never independent approval |
+| `agents/mutation-hardener.md` | Canonical Markdown mutation-hardening contract: pinned coverage/mutation/property-fuzz/CRAP/DRY gates and 100% eligible-target completion |
+| `agents/mutation-hardener.toml` | Equivalent TOML mutation contract; validator enforces body parity with the Markdown file |
+| `.agents/skills/ticket-readiness-review/SKILL.md` | Lens: tickets as executable contracts — self-contained, criteria pointed, graph explicit, sized; gates dispatch |
+| `.agents/skills/implement/SKILL.md` | Explicit convenience alias that loads and follows the complete supervised `implement-feature` skill without duplicating gates |
+| `.agents/skills/explain/SKILL.md` | Post-implementation walkthrough → `docs/walkthroughs/` |
+| `.agents/skills/shape/SKILL.md` | Work-shaping interview (idea / transcript / code / existing spec / task) — the interview only; `to-spec` writes |
+| `.agents/skills/to-spec/SKILL.md` | Writes/updates the capability spec from the interview (never asks back; typed stable IDs issued in continuation) |
+| `.agents/skills/prep/SKILL.md` | One-time repo prep: canonical check/golden/mutation/fuzz interfaces, metric-class gates (stack-agnostic), golden skeleton, minimum CI, ratchet baseline — brownfield-safe |
+| `.agents/skills/orchestrate/SKILL.md` | Wave orchestration over the explicit issue graph: workers run the two internal hardeners; the orchestrator fingerprints CI and repository-configured external review results; humans merge |
+| `.agents/skills/spec-to-tickets/SKILL.md` | Spec → tracer-bullet tickets with blocking edges (quiz before publish; tickets.md or GitHub Issues) |
+| `.agents/skills/plan-from-issue/SKILL.md` | Phased plan from a GitHub issue (Plan Mode; no implementation) |
+| `.agents/skills/review-spec-drift/SKILL.md` | Periodic whole-capability spec ↔ code drift audit (report-only) |
+| `.agents/rules/package-by-feature.md` | Shared capability-boundary rule; root `AGENTS.md` and applicable workflows load it explicitly |
+| `.agents/rules/truth-layer.md` | Shared truth/oracle protection rule; mandatory for every versioned change |
+| `.agents/rules/testing.md` | Shared testing strategy loaded for code/test changes: unit/integration/contract/regression/property-fuzz selection, mutation obligation, anti-gaming, exact evidence |
 | `.claude/hooks/require-spec-for-new-capability.sh` | Example poka-yoke hook (opt-in): blocks a new `src/<x>/` without `specs/<x>/` — wiring snippet in its header |
-| `.claude/routines/frontier-worker.md` | Launcher routine: scans the frontier, claims one issue (lease contract), spawns the child session whose FIRST message is `/implement-backlog issue #N`, validates the structured terminal externally |
+| `.claude/routines/frontier-worker.md` | Launcher routine: scans the frontier, claims one issue (lease contract), spawns the child session whose first message directly invokes `implement-backlog issue #N` using Claude's skill syntax, validates the structured terminal externally |
 
 ## What you still have to build (project-specific)
 
+- Merge the shipped Spec Anchored section of `AGENTS.md` with the repository's
+  real project description, commands, architecture pointers, and capability
+  context; do not replace existing project instructions blindly
 - `architecture/constitution.md` — your non-negotiable domain invariants
-- `specs/<capability>/…` — your capability specs (start with `/shape`)
+- `specs/<capability>/…` — your capability specs (start with `shape`)
 - `architecture/pipeline.md` — capability map and contracts (if applicable)
-- A testing strategy — pyramid, contract tests, golden datasets
+- Repository-declared commands and pinned tools for unit, integration, contract, regression, property/fuzz, coverage, mutation, CRAP, DRY, lint, and types
 - `EVALS.md` — the eval suite (Milestone 1; see the playbook)
-- CI wiring — the four minimum gates, plus deterministic security gates
+- CI wiring — the declared verification, hardening, and deterministic security gates
   (SAST / SCA / secret scanning)
 
-## Model-generation re-audit
+## Worker-model and effort re-audit
 
-When moving this bundle to a new model generation (4.x → 5.x), run
-`claude doctor` and re-audit the prose against the five myth axes
-(rules→judgment; examples→interface design; upfront→progressive
-disclosure; repetition→tool descriptions; simple specs→rich
-references — source #44). Keep the worst-case gates untouched
-(never-proceed-red, do-not-interview, caps, hooks): the vendor's own
-exception is "highly important areas". Record divergences in
-`lessons.md`, and strip only what evals prove safe to strip —
-deletion is eval-gated, not vibes-gated. Known gen-5 items from the
-first official pass (source #46): ULTRATHINK maps to `effort=max` at
-the same judgment points — the keyword changes, the placement survives
-(in this topology Opus's work is plan or review: judgment by
-construction, so **max everywhere**). One **declared adapter
-exception**: the Codex-side reviewer TOML ships `xhigh` — the
-operator's pinned recipe for the Sol worker family. It is an exception
-of record, not a silent default, and it expires unless an eval
-(EVAL-014) compares `xhigh` vs `max` on representative review
-workloads. Effort downgrades are otherwise eval-gated
-on this system's own evals only — the vendor's sweep numbers are a
-hypothesis here, never a default.
+The internal agents intentionally inherit the model selected for the Owner/parent
+worker. When changing that model, harness, or runtime configuration, rerun the
+representative eval suite and verify tool use, context loading, handoffs, mutation
+behavior, and review quality. Keep worst-case gates untouched until evals prove a
+change safe. Both canonical agent contracts require `effort=max`; the Codex TOML
+adapters override only reasoning effort and never pin a model. A runtime that cannot
+honor or disclose `max` must block. Model or effort changes are eval-gated, not
+accepted by reputation or silent fallback.

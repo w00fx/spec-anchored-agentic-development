@@ -14,9 +14,10 @@ provenance: <shape-session / supersedes-revision>
 
 # Capability: <name>
 
-<!-- One spec per capability. PERMANENT: it is the business source of truth for
-     this capability and lives as long as the capability does. There is no
-     "disposable" spec — what is disposable is the implementation plan, not this.
+<!-- One durable logical contract per capability, with this file as the stable
+     entrypoint and corpus map. It may remain one file or declare companion
+     files under the same capability directory. There is no disposable semantic
+     spec — what is disposable is the implementation plan, not this authority.
 
      Sections are ordered by CHANGE RATE: stable at the top constrains the
      volatile below. Each section must be DIAGNOSTIC — if the agent's output
