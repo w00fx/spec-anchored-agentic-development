@@ -14,6 +14,14 @@ Run `scripts/install-codex-port.sh` only when you want the generated
 Claude-specific hooks/routines only and is not shared authority. Read
 `GUIDELINE.md` first; read `AUTONOMY-PLAYBOOK.md` when widening autonomy.
 
+## Prerequisites
+
+Python 3 (CI runs 3.12). The contracts kernel (`scripts/spec-anchored`) and the
+test suites need nothing else. The structural validator and the Codex adapter
+check parse YAML frontmatter and need `pyyaml` (`python3 -m pip install pyyaml`);
+without it the gate stops at its first stage with a clear message. Make sure the
+`python3` on your PATH is the interpreter you installed it into.
+
 ## Where each file goes
 
 | File | What it is |

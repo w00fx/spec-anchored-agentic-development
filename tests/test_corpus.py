@@ -238,8 +238,18 @@ S.holds("X03 leader exits nonzero: the child is reclaimed, the failure survives"
 _rc, _alive = _containment("timeout_alive", "( sleep 3; touch MARKER ) &\nsleep 10", 1)
 S.holds("X03 timeout with a same-group child: exit 124 and no child",
         _rc == 124 and not _alive, f"exit={_rc}, child present={_alive}")
-_rc, _alive = _containment("setsid_escape",
-                           'setsid bash -c "sleep 2; touch MARKER" &\nsleep 10', 1)
+# Portable detach: macOS ships no setsid(1), so a shell-level `setsid` would
+# never spawn the descendant and the fixture would fail for the wrong reason.
+_DETACH = """python3 -c '
+import os, sys, time
+if os.fork() == 0:
+    os.setsid()
+    time.sleep(2)
+    open("MARKER", "w").write("x")
+    sys.exit(0)
+' &
+sleep 10"""
+_rc, _alive = _containment("setsid_escape", _DETACH, 1)
 S.holds("X03 a setsid descendant is OUTSIDE the declared boundary, and the runner "
         "does not pretend otherwise",
         _rc == 124 and _alive,
