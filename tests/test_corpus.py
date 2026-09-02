@@ -29,6 +29,12 @@ RETIRED = {
     "merge-gated": "Waves are merge-gated on main.",
     "creation is always human": "The spec is truth: creation is always human.",
     "semantic /goal variant": "The recommended invocation is the supervised `/goal`.",
+    "retired shared skill namespace": "Use .claude/skills/ as the canonical workflow source.",
+    "retired shared rule namespace": "Use .claude/rules/ as the canonical rule source.",
+    "retired runtime log namespace": "Write run output under .claude/logs/.",
+    "retired protocol namespace": "Read .claude/protocols/implementation-protocol.md.",
+    "rules auto-load claim": "Rules are auto-loaded every session.",
+    "physical spec authority": "Use one spec per capability.",
 }
 import re as _re
 def _legacy_patterns(path):
@@ -84,14 +90,12 @@ def mutated(name, relpath, append=None, overwrite=None):
             fh.write("\n" + append + "\n")
     return gate(d)
 
-hidden_cmd = [p for p in ("commands/shape.md", ".claude/commands/shape.md")
-              if os.path.exists(os.path.join(clean, p))][0]
-_skill_path = [p for p in ("skills/implement-feature/SKILL.md",
-                           "implement-feature/SKILL.md",
-                           ".claude/skills/implement-feature/SKILL.md")
+entry_skill = ".agents/skills/shape/SKILL.md"
+_skill_path = [p for p in ("implement-feature/SKILL.md",
+                           ".agents/skills/implement-feature/SKILL.md")
                if os.path.exists(os.path.join(clean, p))][0]
-S.holds("a retired term hidden in the command corpus is caught",
-        mutated("m_hidden", hidden_cmd, append="Post the PLAN-FINGERPRINT here.") == 1)
+S.holds("a retired term hidden in an entrypoint skill is caught",
+        mutated("m_hidden", entry_skill, append="Post the PLAN-FINGERPRINT here.") == 1)
 S.holds("a syntactically broken contracts CLI fails the gate",
         mutated("m_pyc", "scripts/spec-anchored", overwrite="def (:\n  unclosed(") == 1)
 S.holds("a syntactically broken shell script fails the gate",
@@ -104,6 +108,96 @@ for _fm, _label in (("---\n---\n\n# body\n", "empty mapping"),
             mutated(f"m_fm_{_label.replace(' ', '_').replace('-', '_')}",
                     _skill_path,
                     overwrite=_fm + "\nSee the shared implementation-protocol.md.\n") == 1)
+S.holds("converted entrypoints remain explicit skills",
+        mutated("m_shape_implicit", entry_skill,
+                overwrite=open(os.path.join(clean, entry_skill)).read().replace(
+                    "disable-model-invocation: true\n", "", 1)) == 1)
+S.holds("shared skills remain runtime-neutral instead of embedding slash syntax",
+        mutated("m_runtime_syntax", entry_skill,
+                append="Invoke /shape from this canonical skill.") == 1)
+S.holds("two-agent contract: reintroducing a legacy root reviewer turns the gate red",
+        mutated("m_legacy_reviewer", "agents/reviewer.md",
+                overwrite="---\nname: reviewer\ndescription: legacy\nisolation: worktree\n---\n") == 1)
+S.holds("retired layout: reintroducing .claude/agents turns the gate red",
+        mutated("m_claude_agent", ".claude/agents/reviewer.md",
+                overwrite="---\nname: reviewer\ndescription: legacy\nisolation: worktree\n---\n") == 1)
+S.holds("retired layout: reintroducing .claude/commands turns the gate red",
+        mutated("m_command_dir", ".claude/commands/shape.md",
+                overwrite="---\ndescription: legacy command\n---\n") == 1)
+S.holds("retired layout: reintroducing .claude/skills turns the gate red",
+        mutated("m_claude_skill", ".claude/skills/shape/SKILL.md",
+                overwrite=open(os.path.join(clean, entry_skill)).read()) == 1)
+S.holds("retired layout: reintroducing .claude/rules turns the gate red",
+        mutated("m_claude_rule", ".claude/rules/testing.md",
+                overwrite=open(os.path.join(clean, ".agents/rules/testing.md")).read()) == 1)
+S.holds("retired runtime state: reintroducing .claude/logs turns the gate red",
+        mutated("m_claude_log", ".claude/logs/run.md", overwrite="# stale runtime log\n") == 1)
+S.holds("cross-harness entrypoint: removing AGENTS.md turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    os.remove(os.path.join(d, "AGENTS.md")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_agents_md")) == 1)
+S.holds("cross-harness entrypoint: removing the rule routing turns the gate red",
+        mutated("m_agents_no_rules", "AGENTS.md",
+                overwrite=open(os.path.join(clean, "AGENTS.md")).read().replace(
+                    ".agents/rules/", ".missing/rules/")) == 1)
+S.holds("runtime hygiene: removing .agent-runs from .gitignore turns the gate red",
+        mutated("m_no_run_ignore", ".gitignore",
+                overwrite=open(os.path.join(clean, ".gitignore")).read().replace(
+                    ".agent-runs/", "")) == 1)
+S.holds("runtime hygiene: packaging a run directory turns the gate red",
+        mutated("m_packaged_run", ".agent-runs/RUN-TEST/run-log.md",
+                overwrite="# transient run state\n") == 1)
+S.holds("two-agent contract: a missing Mutation Hardener Markdown contract turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    os.remove(os.path.join(d, "agents/mutation-hardener.md")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_mutation_agent")) == 1)
+S.holds("paired-agent contract: a missing Mutation Hardener TOML turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    os.remove(os.path.join(d, "agents/mutation-hardener.toml")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_mutation_toml")) == 1)
+S.holds("paired-agent contract: TOML instruction drift turns the gate red",
+        mutated("m_agent_toml_drift", "agents/general-code-reviewer.toml",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.toml")).read().replace(
+                    "You receive one exact candidate", "You receive an approximate candidate", 1)) == 1)
+S.holds("testing strategy: removing testing.md turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    os.remove(os.path.join(d, ".agents/rules/testing.md")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_testing_rule")) == 1)
+S.holds("general hardening criteria: removing general-code-review turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    shutil.rmtree(os.path.join(d, ".agents/skills/general-code-review")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_general_review_skill")) == 1)
+S.holds("handoff isolation: removing worktree isolation from an authoring agent turns the gate red",
+        mutated("m_agent_isolation", "agents/general-code-reviewer.md",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.md")).read().replace("isolation: worktree", "isolation: none")) == 1)
+S.holds("agent effort doctrine: lowering Markdown effort from max turns the gate red",
+        mutated("m_agent_effort_md", "agents/general-code-reviewer.md",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.md")).read().replace("effort: max", "effort: high", 1)) == 1)
+S.holds("agent model inheritance: adding a Markdown model pin turns the gate red",
+        mutated("m_agent_model_md", "agents/general-code-reviewer.md",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.md")).read().replace(
+                    "effort: max", "model: pinned-model\neffort: max", 1)) == 1)
+S.holds("agent model inheritance: adding a Codex model pin turns the gate red",
+        mutated("m_agent_model_toml", "agents/general-code-reviewer.toml",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.toml")).read().replace(
+                    'model_reasoning_effort = "max"',
+                    'model = "pinned-model"\nmodel_reasoning_effort = "max"', 1)) == 1)
+S.holds("agent effort doctrine: lowering Codex effort from max turns the gate red",
+        mutated("m_agent_effort_toml", "agents/general-code-reviewer.toml",
+                overwrite=open(os.path.join(clean, "agents/general-code-reviewer.toml")).read().replace(
+                    'model_reasoning_effort = "max"', 'model_reasoning_effort = "xhigh"', 1)) == 1)
+S.holds("shared protocol location: removing .agents/protocols turns the gate red",
+        (lambda d: (shutil.copytree(clean, d),
+                    shutil.rmtree(os.path.join(d, ".agents/protocols")),
+                    gate(d))[-1])(os.path.join(tmp, "m_no_shared_protocol")) == 1)
+S.holds("retired protocol location: reintroducing .claude/protocols turns the gate red",
+        mutated("m_old_protocol_dir", ".claude/protocols/implementation-protocol.md",
+                overwrite=open(os.path.join(clean, ".agents/protocols/implementation-protocol.md")).read()) == 1)
+S.holds("shared protocol reference: an adapter pointing to .claude/protocols turns the gate red",
+        mutated("m_old_protocol_ref", ".agents/skills/implement-feature/SKILL.md",
+                overwrite=open(os.path.join(clean, ".agents/skills/implement-feature/SKILL.md")).read().replace(
+                    ".agents/protocols/implementation-protocol.md",
+                    ".claude/protocols/implementation-protocol.md", 1)) == 1)
 S.holds("closure-v3 an unparseable policy instance turns the gate red",
         mutated("m_inst_json", "policy/instances/example-unattended-payments.json",
                 overwrite="{ INVALID JSON") == 1)
@@ -144,8 +238,8 @@ S.holds("X03 leader exits nonzero: the child is reclaimed, the failure survives"
 _rc, _alive = _containment("timeout_alive", "( sleep 3; touch MARKER ) &\nsleep 10", 1)
 S.holds("X03 timeout with a same-group child: exit 124 and no child",
         _rc == 124 and not _alive, f"exit={_rc}, child present={_alive}")
-# setsid(1) is not shipped on macOS; detach portably so the fixture tests
-# the runner's boundary rather than the presence of a GNU coreutils binary.
+# Portable detach: macOS ships no setsid(1), so a shell-level `setsid` would
+# never spawn the descendant and the fixture would fail for the wrong reason.
 _DETACH = """python3 -c '
 import os, sys, time
 if os.fork() == 0:
@@ -180,9 +274,9 @@ S.holds("X04 no delayed write appears in the grace window after the step returns
 
 S.holds("K08 a NEW python artifact with a syntax error fails the gate",
         mutated("m_newpy", "scripts/new-validator.py", overwrite="def (:\n  broken(") == 1)
-S.holds("an unterminated frontmatter fails the gate",
-        mutated("m_fm", os.path.join(os.path.dirname(hidden_cmd), "zz-probe.md"),
-                overwrite="---\ndescription: unterminated but valid YAML\n") == 1)
+S.holds("an unterminated skill frontmatter fails the gate",
+        mutated("m_fm", entry_skill,
+                overwrite="---\nname: shape\ndescription: unterminated but valid YAML\n") == 1)
 S.holds("removing a contract suite fails the gate",
         (lambda d: (shutil.copytree(clean, d),
                     os.remove(os.path.join(d, "tests/test_kernel_adversarial.py")),

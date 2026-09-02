@@ -55,19 +55,15 @@ step "kernel" "kernel contract checks (fast)" python3 tests/test_kernel_contract
 step "kernel" "kernel adversarial fixtures (fast)" python3 tests/test_kernel_adversarial.py
 step "corpus" "corpus fixtures (slow, run once)" python3 tests/test_corpus.py
 step "mutation" "mutation adequacy (do the fixtures kill regressions?)" python3 tests/test-mutants.py
-if [ -d .agents/skills ]; then
-  step "other" "Codex port drift" bash scripts/install-codex-port.sh --check
-else
-  echo; echo "== Codex port drift: skipped (no .agents/skills — run the installer first)"
-fi
+step "other" "canonical skill/agent adapter validation" bash scripts/install-codex-port.sh --check
 echo
 if [ "$fail" = "0" ]; then
   echo "ALL GREEN — structural + contract + mutation level. Total: ${total}s"
   echo "Inner loop: run only the two fast kernel suites while editing."
   echo "This full gate is the pre-push / CI budget — timing is environment-"
   echo "specific; measure it in your CI rather than trusting a number here."
-  echo "NOT covered here: environment verification (real git, PR, review seal,"
-  echo "approval event, launcher) and every integration eval."
+  echo "NOT covered here: environment verification (real git, agent commit handoffs,"
+  echo "Owner disposition, PR/external-review events, launcher) and every integration eval."
 else
   echo "RED — see failures above"
 fi

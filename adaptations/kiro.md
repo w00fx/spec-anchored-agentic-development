@@ -4,8 +4,7 @@
 
 # Adapting the system to Kiro
 
-Claude Code is this system's **reference implementation**, not a
-requirement. This page maps every artifact onto Kiro (AWS) and names
+The shared `.agents/` core is this system's reference implementation; no single coding harness is a requirement. This page maps every artifact onto Kiro (AWS) and names
 what does not survive the trip. Facts verified 2026-07 against Kiro's
 docs and the official multi-agent CLI sample — Kiro ships fast;
 re-verify on adoption.
@@ -20,7 +19,7 @@ capable of hard-blocking — alongside the older file-event hooks.
 ## The thesis: anchored on top of spec-first
 
 Kiro supports persistent, continuously refined Feature Specs (and a gate-less Quick Spec). The difference is not persistence alone: Spec Anchored hardens stable requirement IDs, repository ratification, conformance evidence, exact-candidate review, and drift policy on top.
-This system is spec-anchored (one permanent spec per capability). The
+This system is spec-anchored (one durable logical capability contract with a stable entrypoint). The
 reconciliation: **the permanent layer lives outside `.kiro/`** — plain
 repo files, tool-agnostic by construction — and **Kiro's per-work spec
 trio becomes this system's execution layer.** Bonus: Kiro speaks EARS
@@ -36,13 +35,13 @@ agent's mother tongue.
 | Root + capability `AGENTS.md` | **Read natively** (the open standard Kiro supports). Keep `AGENTS.md` as the single source; a thin `CLAUDE.md` doing `@AGENTS.md` serves Claude Code |
 | Kiro-specific always-rules | Steering, `inclusion: always` |
 | Per-capability additions | Steering with `fileMatch: src/<capability>/**` |
-| `.claude/rules/package-by-feature.md` | Always-included steering file |
-| The 10 commands (`/shape`, `/to-spec`, `/prep`, `/orchestrate`, …) | **Stored prompts** (`/prompts shape`) — the bodies are portable by design ("works as a standalone prompt") |
+| `.agents/rules/package-by-feature.md` | Always-included steering file |
+| Canonical `.agents/skills/` entrypoints | Map to Kiro skills/stored prompts or custom agents as appropriate; the checked-in skill body remains the authority |
 | `implement-feature` / `implement-backlog` skills | **Custom agents** — the skill body becomes the agent prompt (the official sample's `coder` pattern) |
-| Reviewer subagent + 4 criteria lenses | Reviewer agent(s) + skills as lenses, delegated via `/spawn` — the official sample ships `reviewer` + `security-reviewer` in exactly this shape |
+| General Code Reviewer + Mutation Hardener | Two authoring subagents delegated via `/spawn`; each works from an exact checkpoint and returns a committed delta + alteration report for Owner acceptance |
 | Poka-yoke hook (spec-before-src) | **Before-tool-use lifecycle hook with hard-block** — ports, arguably with a richer surface ("hooks beat promises") |
-| Structured run logs | Trace hooks (community pattern: trace-audit) |
-| GitHub backlog, labels, `/spec-to-tickets` output, CI gates, golden tests | Unchanged — tool-agnostic |
+| Structured run logs | `.agent-runs/<run-id>/` as the shared artifact contract; Kiro trace hooks may populate it |
+| GitHub backlog, labels, `spec-to-tickets` output, CI gates, golden tests | Unchanged — tool-agnostic |
 
 ## Kiro's spec trio as the execution layer
 
@@ -51,9 +50,9 @@ agent's mother tongue.
   commit <sha> — AC-<CAP>-###`). Steering carries the law: point,
   never copy.
 - **`design.md`** = the plan (protocol Phase 3) — disposable, plan-shaped; the
-  plan-review criteria apply to it as-is.
+  the human approval gate applies directly; no internal plan-review agent is required.
 - **`tasks.md`** = `tickets.md` in the local mode of
-  `/spec-to-tickets`.
+  `spec-to-tickets`.
 - Kiro's native approval gates (requirements → design → tasks) **are**
   the supervised gate structure, built into the product.
 
@@ -65,25 +64,22 @@ agent's mother tongue.
    (autopilot over the task list; specialized subagents) is
    **progress-granular** — "were the tasks checked off?" — not
    condition-verified. Porting `implement-backlog` means returning to
-   prompted persistence (~70% adherence, the pre-`/goal` era). The
+   instruction-following without an equivalent independent completion mechanism. The
    supervised path ports well; the autonomous path ports with weaker
    guarantees.
-2. **The model re-audit fires in full.** Every prompt artifact here is
-   tuned for Claude Opus 4.8; Kiro runs Bedrock FMs, and the harness
-   levers this system leans on (ULTRATHINK, plan-mode substitutes,
-   Claude Code's `/advisor` — none of them bundle artifacts) don't
-   exist there.
-   The skills' own doctrine applies: on a model change, re-audit —
-   this is the adaptation's largest real cost.
+2. **The model re-audit fires in full.** The repository does not pin an
+   internal-agent model; each role inherits the Owner/parent worker model.
+   Runtime-specific thinking controls, plan-mode substitutes, and advisor
+   features do not transfer automatically. The skills' own doctrine applies:
+   on any model or harness change, re-run the representative evals and keep
+   `effort=max` as a separate requirement.
 3. **Evidence becomes discipline, not mechanism.** Trace hooks can
    build the audit trail, but nothing mechanically *demands* "runner
    output visible" the way the `/goal` evaluator does.
 
 ## Recommended topology: hybrid (the community norm)
 
-Kiro for the supervised human side — shape → spec → tickets →
-implement, with its native gates — and Claude Code for the autonomous
-route (`/goal` + Routines), **both over the same repo truth**
+Kiro can host the supervised human side — shape → spec → tickets → implement — while another qualified launcher/runtime may host unattended work, **all over the same repository truth**
 (`specs/`, `architecture/`, `AGENTS.md`). Context single-sourcing:
 content in `AGENTS.md`, a thin `CLAUDE.md` pointing at it, steering
 only for what is Kiro-specific. "Many teams run both" is the observed

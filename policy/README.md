@@ -41,11 +41,11 @@ config, spec templates, doctrine, and `evals/spec-anchored/**`. The
 project's own tests, and `evals/` outside that namespace, stay free.
 A repository whose `scripts/` holds product code should install the
 harness under `.spec-anchored/`, which is reserved for that purpose.
-**This is an installation contract, not yet a materialized layout**:
-the bundle ships no installer that performs or verifies the split
-(`.claude/` and `.agents/` must stay at their discovery locations), so
-treat it as a portability precondition for publishing across arbitrary
-repositories, tracked as integration work rather than as doctrine.
+The checked-in authority stays in root `AGENTS.md`, `.agents/skills/`,
+`.agents/rules/`, `.agents/protocols/`, and root `agents/`. Transient state lives
+only under the gitignored `.agent-runs/<run-id>/`. `scripts/install-codex-port.sh`
+materializes only the disposable `.codex/agents/` adapters; shared skills and
+protocols are already native in `.agents/` and never gain a second authority.
 
 **Literal paths and glob expressions are different things.** A value with
 no matcher operator (`*`, `?`, `**`, `**/`) is a *literal path* and may

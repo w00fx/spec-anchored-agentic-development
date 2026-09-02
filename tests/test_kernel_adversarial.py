@@ -105,9 +105,17 @@ S.violations("a run rewriting the contracts that judge it is refused (governance
 S.violations("a run rewriting its own policy profile is refused",
              scope, manifest(mechanical_scope={"allowed_paths": ["**"]}),
              [("M", "policy/unattended-v1.json")])
-S.violations("a run editing the reviewer agent is refused",
+for agent_path in ("agents/general-code-reviewer.md",
+                   "agents/general-code-reviewer.toml",
+                   "agents/mutation-hardener.md",
+                   "agents/mutation-hardener.toml"):
+    S.violations(f"a run editing internal authoring agent {agent_path} is refused",
+                 scope, manifest(mechanical_scope={"allowed_paths": ["**"]}),
+                 [("M", agent_path)])
+
+S.violations("a run editing the shared implementation protocol is refused",
              scope, manifest(mechanical_scope={"allowed_paths": ["**"]}),
-             [("M", ".claude/agents/reviewer.md")])
+             [("M", ".agents/protocols/implementation-protocol.md")])
 
 S.violations("an oracle living under specs/ needs BOTH grants (most-restrictive-wins)",
              scope, manifest(truth_change={"policy": "semantic-amendment",
@@ -501,15 +509,18 @@ S.section("E result: fake terminals")
 PR = {"schema_version": 1, "run_id": "RUN-ADV", "issue_ref": "org/repo#1",
       "terminal": "PR_READY_AWAITING_HUMAN", "claim_state": "parked",
       "pr_url": "https://github.com/org/repo/pull/1", "head_sha": "a" * 40,
-      "approval_fingerprint": "b" * 64, "review_report_sha256": "c" * 64,
-      "review_seal_sha256": "d" * 64}
+      "approval_fingerprint": "b" * 64,
+      "general_hardening_report_sha256": "c" * 64,
+      "mutation_hardening_report_sha256": "d" * 64,
+      "owner_disposition_sha256": "e" * 64}
 S.clean("a well-formed PR_READY passes", sa.validate_result, PR)
 S.violations("a PR_READY of all-'x' placeholders is refused", sa.validate_result,
              {**{k: "x" for k in PR}, "terminal": "PR_READY_AWAITING_HUMAN"})
 S.violations("a no-change with an invented classification is refused", sa.validate_result,
              {"schema_version": 1, "run_id": "RUN-ADV", "issue_ref": "org/repo#1",
               "terminal": "NO_CHANGE_REQUIRED", "claim_state": "released",
-              "evidence_target_sha256": "a" * 64, "review_report_sha256": "b" * 64,
+              "evidence_target_sha256": "a" * 64,
+              "no_change_corroboration_sha256": "b" * 64,
               "classification": "BANANA", "corroborated": True})
 S.violations("a blocker with an invented kind and a PR attached is refused", sa.validate_result,
              {"schema_version": 1, "run_id": "RUN-ADV", "issue_ref": "org/repo#1",
@@ -518,6 +529,10 @@ S.violations("a blocker with an invented kind and a PR attached is refused", sa.
               "pr_url": "https://github.com/org/repo/pull/2"})
 S.violations("an unknown extra field is refused (strict union)", sa.validate_result,
              {**PR, "auto_merge": True})
+S.violations("a legacy independent-review seal is refused in the worker terminal",
+             sa.validate_result, {**PR, "review_seal_sha256": "f" * 64})
+S.violations("a PR terminal without Owner acceptance is refused", sa.validate_result,
+             {k: v for k, v in PR.items() if k != "owner_disposition_sha256"})
 S.violations("a short head SHA is refused", sa.validate_result, {**PR, "head_sha": "abc123"})
 S.violations("a blocker reported on another repository's issue is refused",
              sa.validate_result,
